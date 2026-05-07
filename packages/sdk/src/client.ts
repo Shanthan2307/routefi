@@ -48,8 +48,11 @@ export class RoutefiClient {
         : undefined,
     );
 
-    // Create an EVM account (acts as the signer for x402 payments)
-    const account = await cdp.evm.createAccount();
+    // Reuse a named account so the same wallet address is returned on every run.
+    // Falls back to createAccount if getOrCreateAccount is unavailable.
+    const account = await (cdp.evm.getOrCreateAccount
+      ? cdp.evm.getOrCreateAccount({ name: "routefi-agent" })
+      : cdp.evm.createAccount());
     this.walletAddress = account.address;
 
     // Build x402 client with EVM payment scheme

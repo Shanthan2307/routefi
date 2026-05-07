@@ -1,4 +1,4 @@
-import { RequestTapClient as RoutefiClient } from "@routefi/sdk";
+import { RoutefiClient } from "@routefi/sdk";
 import { writeFileSync } from "fs";
 
 const GATEWAY_URL = process.env.RT_GATEWAY_URL || "http://localhost:4402";

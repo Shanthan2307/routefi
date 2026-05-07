@@ -302,16 +302,7 @@ export function createApp({ config, routes }: CreateAppOptions) {
     (req as any).routePrice = matchResult.price;
     (req as any)._matchResult = matchResult;
 
-    // 2. Idempotency check
-    const idempotencyMw = createIdempotencyMiddleware(replayStore, config);
-    const idempotencyResult = await new Promise<boolean>((resolve) => {
-      idempotencyMw(req, res, () => resolve(true));
-      // If middleware sends response, promise won't resolve via next()
-      if (res.headersSent) resolve(false);
-    });
-    if (!idempotencyResult) return;
-
-    // 3. Mandate verification
+    // 2. Mandate verification
     const mandateMw = createMandateMiddleware(spendTracker, lifetimeTracker, config);
     const mandateResult = await new Promise<boolean>((resolve) => {
       mandateMw(req, res, () => resolve(true));
@@ -319,12 +310,22 @@ export function createApp({ config, routes }: CreateAppOptions) {
     });
     if (!mandateResult) return;
 
-    // 4. Payment verification (x402)
+    // 3. Payment verification (x402) — must run before idempotency so the
+    //    SDK's pay-and-retry flow isn't blocked as a duplicate on the retry.
     const paymentResult = await new Promise<boolean>((resolve) => {
       paymentSystem.middleware(req, res, () => resolve(true));
       if (res.headersSent) resolve(false);
     });
     if (!paymentResult) return;
+
+    // 4. Idempotency check — only reached after payment passes, so the
+    //    first (unpaid) 402 attempt never pollutes the replay store.
+    const idempotencyMw = createIdempotencyMiddleware(replayStore, config);
+    const idempotencyResult = await new Promise<boolean>((resolve) => {
+      idempotencyMw(req, res, () => resolve(true));
+      if (res.headersSent) resolve(false);
+    });
+    if (!idempotencyResult) return;
 
     // 5. Proxy to upstream
     try {

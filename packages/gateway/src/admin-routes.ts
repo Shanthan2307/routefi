@@ -206,6 +206,36 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
     res.json({ ok: true });
   });
 
+  // POST /admin/receipts/inject — add a synthetic receipt (for demo/simulation)
+  router.post("/receipts/inject", (req, res) => {
+    const { v4: uuidv4 } = { v4: () => Math.random().toString(36).slice(2) } as any;
+    const body = req.body || {};
+    const receipt = {
+      request_id: body.request_id || uuidv4(),
+      tool_id: body.tool_id || "unknown",
+      provider_id: body.provider_id || "unknown",
+      endpoint: body.endpoint || "/",
+      method: body.method || "GET",
+      timestamp: new Date().toISOString(),
+      price_usdc: body.price_usdc || "0.001",
+      currency: body.currency || "USDC",
+      chain: body.chain || "base-sepolia",
+      mandate_id: null,
+      mandate_hash: null,
+      mandate_verdict: "SKIPPED",
+      reason_code: body.reason_code || "OK",
+      payment_tx_hash: body.payment_tx_hash || null,
+      facilitator_receipt_id: body.facilitator_receipt_id || null,
+      request_hash: "",
+      response_hash: null,
+      latency_ms: 420,
+      outcome: body.outcome || "SUCCESS",
+      explanation: body.explanation || "Injected receipt",
+    };
+    receiptStore.add(receipt as any);
+    res.json({ ok: true, receipt });
+  });
+
   // GET /admin/receipts/stats
   router.get("/receipts/stats", (_req, res) => {
     const all = receiptStore.query();

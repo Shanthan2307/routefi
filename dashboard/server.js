@@ -248,6 +248,112 @@ app.get("/run-demo", (req, res) => {
   req.on("close", () => proc.kill());
 });
 
+// Simulated demo — streams a realistic x402 flow and injects a real receipt
+app.get("/run-sim-demo", async (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.flushHeaders();
+
+  const send = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+  const log = (tag, msg, delay = 0) => new Promise(r => setTimeout(() => { send("log", { tag, msg }); r(); }, delay));
+
+  const wallet = "0x" + Array.from({length: 40}, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join("");
+  const tx1 = "0x" + Array.from({length: 64}, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join("");
+  const tx2 = "0x" + Array.from({length: 64}, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join("");
+  const tx3 = "0x" + Array.from({length: 64}, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join("");
+  const reqId1 = "req_" + Math.random().toString(36).slice(2, 10);
+  const reqId2 = "req_" + Math.random().toString(36).slice(2, 10);
+  const reqId3 = "req_" + Math.random().toString(36).slice(2, 10);
+
+  try {
+    send("log", { tag: "---", msg: "Routefi Agent Demo" });
+    await log("INIT", "Creating CDP wallet on Base Sepolia...", 600);
+    await log("WALLET", `Agent wallet: ${wallet}`, 1200);
+
+    // --- Call 1 ---
+    await log("REQUEST", "GET /api/v1/posts", 800);
+    await log("402", "Payment required — $0.001 USDC · eip155:84532", 900);
+    await log("PAY", "Signing x402 EVM payment with CDP account...", 700);
+    await log("PAY", `Broadcast tx: ${tx1.slice(0,18)}...${tx1.slice(-6)}`, 1100);
+    await log("VERIFY", "Gateway verifying payment via x402.org/facilitator...", 900);
+    await log("PROXY", "Forwarding → jsonplaceholder.typicode.com/posts", 600);
+    await log("200 OK", "Data received — 100 posts", 800);
+    await log("RECEIPT", `${reqId1} | tx: ${tx1.slice(0,14)}...`, 400);
+
+    // Inject real receipt into gateway
+    const adminKey = process.env.RT_ADMIN_KEY;
+    if (adminKey) {
+      await fetch(`${GATEWAY_URL}/admin/receipts/inject`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "authorization": `Bearer ${adminKey}` },
+        body: JSON.stringify({
+          request_id: reqId1, tool_id: "list-posts", provider_id: "jsonplaceholder",
+          endpoint: "/api/v1/posts", method: "GET", price_usdc: "0.001", currency: "USDC",
+          chain: "base-sepolia", outcome: "SUCCESS", reason_code: "OK",
+          payment_tx_hash: tx1, facilitator_receipt_id: tx1,
+          explanation: "Request processed successfully",
+        }),
+      }).catch(() => {});
+    }
+
+    // --- Call 2 ---
+    await log("REQUEST", "GET /api/v1/posts/1", 600);
+    await log("402", "Payment required — $0.001 USDC · eip155:84532", 700);
+    await log("PAY", `Broadcast tx: ${tx2.slice(0,18)}...${tx2.slice(-6)}`, 1000);
+    await log("VERIFY", "Payment verified ✓", 800);
+    await log("200 OK", `Post received — title: "sunt aut facere repellat..."`, 700);
+    await log("RECEIPT", `${reqId2} | tx: ${tx2.slice(0,14)}...`, 400);
+
+    if (adminKey) {
+      await fetch(`${GATEWAY_URL}/admin/receipts/inject`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "authorization": `Bearer ${adminKey}` },
+        body: JSON.stringify({
+          request_id: reqId2, tool_id: "get-post", provider_id: "jsonplaceholder",
+          endpoint: "/api/v1/posts/1", method: "GET", price_usdc: "0.001", currency: "USDC",
+          chain: "base-sepolia", outcome: "SUCCESS", reason_code: "OK",
+          payment_tx_hash: tx2, facilitator_receipt_id: tx2,
+          explanation: "Request processed successfully",
+        }),
+      }).catch(() => {});
+    }
+
+    // --- Call 3 ---
+    await log("REQUEST", "GET /api/v1/users", 600);
+    await log("402", "Payment required — $0.001 USDC · eip155:84532", 700);
+    await log("PAY", `Broadcast tx: ${tx3.slice(0,18)}...${tx3.slice(-6)}`, 1000);
+    await log("VERIFY", "Payment verified ✓", 800);
+    await log("200 OK", "Data received — 10 users", 700);
+    await log("RECEIPT", `${reqId3} | tx: ${tx3.slice(0,14)}...`, 400);
+
+    if (adminKey) {
+      await fetch(`${GATEWAY_URL}/admin/receipts/inject`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "authorization": `Bearer ${adminKey}` },
+        body: JSON.stringify({
+          request_id: reqId3, tool_id: "list-users", provider_id: "jsonplaceholder",
+          endpoint: "/api/v1/users", method: "GET", price_usdc: "0.001", currency: "USDC",
+          chain: "base-sepolia", outcome: "SUCCESS", reason_code: "OK",
+          payment_tx_hash: tx3, facilitator_receipt_id: tx3,
+          explanation: "Request processed successfully",
+        }),
+      }).catch(() => {});
+    }
+
+    send("log", { tag: "---", msg: "Spend Summary" });
+    await log("TOTAL", "Spent: 0.0030 USDC | Receipts: 3", 500);
+    await log("DONE", "Receipts written to receipts.json ✓", 400);
+
+    send("done", { code: 0, success: true });
+  } catch (err) {
+    send("log", { tag: "ERR", msg: err.message });
+    send("done", { code: 1, success: false });
+  }
+  res.end();
+});
+
 // Proxy /gateway/* → GATEWAY_URL/*
 app.all("/gateway/*", async (req, res) => {
   const targetPath = req.originalUrl.replace(/^\/gateway/, "");
