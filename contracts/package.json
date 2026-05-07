@@ -1,0 +1,18 @@
+{
+  "name": "@routefi/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:calypso": "npx hardhat run scripts/deploy.cjs --network skaleCalypso",
+    "deploy:base-sepolia": "npx hardhat run scripts/deploy.cjs --network skaleBaseSepolia",
+    "deploy:base-mainnet": "npx hardhat run scripts/deploy.cjs --network skaleBaseMainnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.22.0"
+  }
+}

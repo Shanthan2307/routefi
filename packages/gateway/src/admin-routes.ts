@@ -1,0 +1,775 @@
+import { Router } from "express";
+import { writeFileSync } from "fs";
+import { createAdminAuth } from "./middleware/admin-auth.js";
+import type { RouteManager } from "./server.js";
+import { SSRFError } from "./utils/ssrf.js";
+import type { ReceiptStore } from "./services/receipt-store.js";
+import type { SpendTracker, LifetimeSpendTracker } from "./ap2.js";
+import type { GatewayConfig } from "./config.js";
+import type { ConfigStore } from "./services/config-store.js";
+import type { BiteService } from "./bite.js";
+import type { ReputationService } from "./services/reputation.js";
+import type { PaymentSystem } from "./middleware/payment.js";
+import { parseOpenApiToRoutes } from "./services/openapi-parser.js";
+import { generateAgentApiDocs } from "./services/docs-generator.js";
+import { assertNotX402Upstream, X402UpstreamError } from "./utils/x402-probe.js";
+import { keccak256, toHex } from "viem";
+
+export interface AdminRouterDeps {
+  routeManager: RouteManager;
+  receiptStore: ReceiptStore;
+  spendTracker: SpendTracker;
+  lifetimeTracker: LifetimeSpendTracker;
+  config: GatewayConfig;
+  configStore: ConfigStore;
+  startTime: number;
+  biteService: BiteService | null;
+  reputationService: ReputationService | null;
+  paymentSystem: PaymentSystem;
+}
+
+export function createAdminRouter(deps: AdminRouterDeps): Router {
+  const { routeManager, receiptStore, spendTracker, lifetimeTracker, config, configStore, startTime, biteService, reputationService, paymentSystem } = deps;
+  const router = Router();
+
+  router.use(createAdminAuth());
+
+  // GET /admin/health
+  router.get("/health", (_req, res) => {
+    const uptimeMs = Date.now() - startTime;
+    const routes = routeManager.getRoutes();
+    const receipts = receiptStore.query();
+    res.json({
+      status: "ok",
+      uptime_ms: uptimeMs,
+      uptime_human: formatUptime(uptimeMs),
+      route_count: routes.length,
+      receipt_count: receipts.length,
+    });
+  });
+
+  // GET /admin/config
+  router.get("/config", (_req, res) => {
+    res.json({
+      port: config.port,
+      baseNetwork: config.baseNetwork,
+      facilitatorUrl: config.facilitatorUrl,
+      replayTtlMs: config.replayTtlMs,
+      payToAddress: config.payToAddress ? mask(config.payToAddress, 6, 4) : null,
+      routesFile: process.env.RT_ROUTES_FILE || null,
+      erc8004: config.erc8004RpcUrl ? {
+        contract: config.erc8004Contract,
+        minScore: config.erc8004MinScore ?? 20,
+      } : null,
+    });
+  });
+
+  // GET /admin/routes
+  router.get("/routes", (_req, res) => {
+    const routes = routeManager.getRoutes().map((r) => ({
+      method: r.method,
+      path: r.path,
+      tool_id: r.tool_id,
+      price_usdc: r.price_usdc,
+      group: r.group || null,
+      description: r.description || null,
+      restricted: r.restricted || false,
+      provider: {
+        provider_id: r.provider.provider_id,
+        backend_url: r.provider.backend_url,
+        auth: r.provider.auth
+          ? { header: r.provider.auth.header, value: "***" }
+          : undefined,
+      },
+    }));
+    res.json({ routes });
+  });
+
+  // POST /admin/routes
+  router.post("/routes", async (req, res) => {
+    const { method, path, tool_id, price_usdc, provider } = req.body;
+
+    // Validate required fields
+    if (!method || typeof method !== "string") {
+      res.status(400).json({ error: "method is required (string)" });
+      return;
+    }
+    if (!path || typeof path !== "string" || !path.startsWith("/")) {
+      res.status(400).json({ error: "path is required (string starting with /)" });
+      return;
+    }
+    if (!tool_id || typeof tool_id !== "string") {
+      res.status(400).json({ error: "tool_id is required (string)" });
+      return;
+    }
+    if (!price_usdc || typeof price_usdc !== "string" || isNaN(parseFloat(price_usdc))) {
+      res.status(400).json({ error: "price_usdc is required (decimal string)" });
+      return;
+    }
+    if (!provider || typeof provider !== "object") {
+      res.status(400).json({ error: "provider is required (object)" });
+      return;
+    }
+    if (!provider.provider_id || !provider.backend_url) {
+      res.status(400).json({ error: "provider.provider_id and provider.backend_url are required" });
+      return;
+    }
+
+    const rule: any = {
+      method: method.toUpperCase(),
+      path,
+      tool_id,
+      price_usdc,
+      provider: {
+        provider_id: provider.provider_id,
+        backend_url: provider.backend_url,
+        ...(provider.auth ? { auth: { header: provider.auth.header, value: provider.auth.value } } : {}),
+      },
+    };
+    if (req.body.description) rule.description = req.body.description;
+    if (req.body.group) rule.group = req.body.group;
+    if (req.body.restricted === true) rule.restricted = true;
+
+    const skipSsrf = req.body._skip_ssrf === true;
+    try {
+      await assertNotX402Upstream(rule.provider.backend_url, rule.path);
+      routeManager.addRoute(rule, skipSsrf ? { skipSsrf: true } : undefined);
+    } catch (err: any) {
+      if (err instanceof X402UpstreamError) {
+        res.status(400).json({ error: err.message, reason: "X402_UPSTREAM_BLOCKED" });
+        return;
+      }
+      if (err instanceof SSRFError) {
+        res.status(400).json({ error: err.message, reason: "SSRF_BLOCKED" });
+        return;
+      }
+      res.status(400).json({ error: err.message });
+      return;
+    }
+
+    // Persist to file if RT_ROUTES_FILE is set
+    const routesFile = process.env.RT_ROUTES_FILE;
+    if (routesFile) {
+      try {
+        writeFileSync(routesFile, JSON.stringify({ routes: routeManager.getRoutes() }, null, 2));
+      } catch {
+        // Non-fatal: route was added in-memory
+      }
+    }
+
+    res.status(201).json({ ok: true, route: rule });
+  });
+
+  // DELETE /admin/routes/:toolId
+  router.delete("/routes/:toolId", (req, res) => {
+    const removed = routeManager.removeRoute(req.params.toolId);
+    if (!removed) {
+      res.status(404).json({ error: `Route with tool_id "${req.params.toolId}" not found` });
+      return;
+    }
+
+    // Persist to file if RT_ROUTES_FILE is set
+    const routesFile = process.env.RT_ROUTES_FILE;
+    if (routesFile) {
+      try {
+        writeFileSync(routesFile, JSON.stringify({ routes: routeManager.getRoutes() }, null, 2));
+      } catch {
+        // Non-fatal
+      }
+    }
+
+    res.json({ ok: true, tool_id: req.params.toolId });
+  });
+
+  // GET /admin/receipts
+  router.get("/receipts", (req, res) => {
+    const filter: { tool_id?: string; outcome?: string } = {};
+    if (req.query.tool_id) filter.tool_id = String(req.query.tool_id);
+    if (req.query.outcome) filter.outcome = String(req.query.outcome);
+
+    let receipts = receiptStore.query(filter);
+
+    // Sort newest first
+    receipts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    const offset = parseInt(String(req.query.offset || "0"), 10) || 0;
+    const limit = parseInt(String(req.query.limit || "50"), 10) || 50;
+    const total = receipts.length;
+    receipts = receipts.slice(offset, offset + limit);
+
+    res.json({ receipts, total, offset, limit });
+  });
+
+  // DELETE /admin/receipts
+  router.delete("/receipts", (_req, res) => {
+    receiptStore.clear();
+    res.json({ ok: true });
+  });
+
+  // GET /admin/receipts/stats
+  router.get("/receipts/stats", (_req, res) => {
+    const all = receiptStore.query();
+    const total = all.length;
+    const success = all.filter((r) => r.outcome === "SUCCESS").length;
+    const error = all.filter((r) => r.outcome === "ERROR").length;
+    const denied = all.filter((r) => r.outcome === "DENIED").length;
+    const successRate = total > 0 ? ((success / total) * 100).toFixed(1) : "0.0";
+    const totalUsdc = all.reduce((sum, r) => sum + parseFloat(r.price_usdc || "0"), 0).toFixed(6);
+    const latencies = all.filter((r) => r.latency_ms != null).map((r) => r.latency_ms!);
+    const avgLatency = latencies.length > 0
+      ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
+      : 0;
+
+    res.json({
+      total_requests: total,
+      success_count: success,
+      error_count: error,
+      denied_count: denied,
+      success_rate: successRate,
+      total_usdc_spent: totalUsdc,
+      avg_latency_ms: avgLatency,
+    });
+  });
+
+  // GET /admin/spend/:mandateId
+  router.get("/spend/:mandateId", (req, res) => {
+    const spent = spendTracker.getSpent(req.params.mandateId);
+    res.json({
+      mandate_id: req.params.mandateId,
+      spent_today_usdc: spent.toFixed(6),
+      date: new Date().toISOString().slice(0, 10),
+    });
+  });
+
+  // GET /admin/intent-spend/:mandateKey
+  router.get("/intent-spend/:mandateKey", (req, res) => {
+    const spent = lifetimeTracker.getSpent(req.params.mandateKey);
+    res.json({
+      mandate_key: req.params.mandateKey,
+      spent_lifetime_usdc: spent.toFixed(6),
+    });
+  });
+
+  // GET /admin/dashboard-config
+  router.get("/dashboard-config", (_req, res) => {
+    const dashConfig = configStore.load();
+    res.json(dashConfig);
+  });
+
+  // PUT /admin/dashboard-config
+  router.put("/dashboard-config", (req, res) => {
+    const body = req.body;
+    if (!body || typeof body !== "object") {
+      res.status(400).json({ error: "Request body must be an object" });
+      return;
+    }
+
+    const current = configStore.load();
+    const updated = { ...current, ...body };
+
+    // Apply payToAddress to live config if provided
+    if (typeof updated.payToAddress === "string" && updated.payToAddress) {
+      (config as any).payToAddress = updated.payToAddress;
+    }
+    // Apply baseNetwork to live config if provided
+    if (typeof updated.baseNetwork === "string" && updated.baseNetwork) {
+      (config as any).baseNetwork = updated.baseNetwork;
+    }
+
+    try {
+      configStore.save(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: `Failed to save config: ${err.message}` });
+      return;
+    }
+
+    res.json({ ok: true, config: updated });
+  });
+
+  // PUT /admin/routes/:toolId
+  router.put("/routes/:toolId", (req, res) => {
+    const { toolId } = req.params;
+    const routes = routeManager.getRoutes();
+    const idx = routes.findIndex((r) => r.tool_id === toolId);
+    if (idx === -1) {
+      res.status(404).json({ error: `Route with tool_id "${toolId}" not found` });
+      return;
+    }
+
+    const existing = routes[idx];
+    const body = req.body;
+
+    // Update allowed fields
+    if (typeof body.price_usdc === "string") existing.price_usdc = body.price_usdc;
+    if (typeof body.group === "string" || body.group === null) existing.group = body.group || undefined;
+    if (typeof body.description === "string") existing.description = body.description;
+    if (typeof body.restricted === "boolean") existing.restricted = body.restricted;
+    if (body.provider && typeof body.provider === "object") {
+      if (body.provider.backend_url) existing.provider.backend_url = body.provider.backend_url;
+      if (body.provider.provider_id) existing.provider.provider_id = body.provider.provider_id;
+      if (body.provider.auth) {
+        existing.provider.auth = { header: body.provider.auth.header, value: body.provider.auth.value };
+      }
+    }
+
+    // Recompile routes
+    routeManager.removeRoute(toolId);
+    routeManager.addRoute(existing);
+
+    // Persist
+    persistRoutes(routeManager);
+
+    res.json({ ok: true, route: existing });
+  });
+
+  // POST /admin/routes/import
+  router.post("/routes/import", async (req, res) => {
+    const { openapi, defaults } = req.body;
+
+    if (!openapi || typeof openapi !== "object") {
+      res.status(400).json({ error: "openapi spec object is required" });
+      return;
+    }
+    if (!defaults || typeof defaults !== "object") {
+      res.status(400).json({ error: "defaults object is required" });
+      return;
+    }
+    if (!defaults.providerId || !defaults.backendUrl || !defaults.priceUsdc) {
+      res.status(400).json({ error: "defaults must include providerId, backendUrl, priceUsdc" });
+      return;
+    }
+
+    let imported;
+    try {
+      imported = parseOpenApiToRoutes(openapi, defaults);
+    } catch (err: any) {
+      res.status(400).json({ error: `Failed to parse OpenAPI spec: ${err.message}` });
+      return;
+    }
+
+    const added: string[] = [];
+    const skipped: string[] = [];
+    for (const rule of imported) {
+      try {
+        await assertNotX402Upstream(rule.provider.backend_url, rule.path);
+        routeManager.addRoute(rule);
+        added.push(rule.tool_id);
+      } catch (err) {
+        if (err instanceof X402UpstreamError) {
+          skipped.push(`${rule.tool_id} (x402 upstream blocked)`);
+        } else {
+          skipped.push(rule.tool_id);
+        }
+      }
+    }
+
+    persistRoutes(routeManager);
+
+    res.status(201).json({ ok: true, added_count: added.length, skipped_count: skipped.length, added, skipped });
+  });
+
+  // GET /admin/docs/openapi
+  router.get("/docs/openapi", (_req, res) => {
+    const routes = routeManager.getRoutes();
+    const dashConfig = configStore.load();
+    const spec = generateAgentApiDocs(routes, dashConfig.routeGroups, {
+      baseUrl: `http://localhost:${config.port}`,
+      payToAddress: dashConfig.payToAddress || config.payToAddress,
+    });
+    res.json(spec);
+  });
+
+  // GET /admin/blacklist
+  router.get("/blacklist", (_req, res) => {
+    const dashConfig = configStore.load();
+    res.json({ blacklist: dashConfig.blacklist || [] });
+  });
+
+  // POST /admin/blacklist
+  router.post("/blacklist", (req, res) => {
+    const { address } = req.body;
+    if (!address || typeof address !== "string") {
+      res.status(400).json({ error: "address is required (string)" });
+      return;
+    }
+    const current = configStore.load();
+    const list: string[] = current.blacklist || [];
+    const normalized = address.toLowerCase();
+    if (!list.includes(normalized)) list.push(normalized);
+    current.blacklist = list;
+    try {
+      configStore.save(current);
+    } catch (err: any) {
+      res.status(500).json({ error: `Failed to save: ${err.message}` });
+      return;
+    }
+    res.json({ ok: true, blacklist: list });
+  });
+
+  // GET /admin/facilitator/status — check x402 facilitator connectivity
+  router.get("/facilitator/status", async (_req, res) => {
+    const url = config.facilitatorUrl.replace(/\/$/, "") + "/supported";
+    try {
+      const headers: Record<string, string> = {};
+      if (config.cdpApiKeyId && config.cdpApiKeySecret) {
+        const { generateJwt } = await import("@coinbase/cdp-sdk/auth");
+        const host = new URL(config.facilitatorUrl).host;
+        const path = new URL(url).pathname;
+        const token = await generateJwt({
+          apiKeyId: config.cdpApiKeyId,
+          apiKeySecret: config.cdpApiKeySecret,
+          requestMethod: "GET",
+          requestHost: host,
+          requestPath: path,
+        });
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const r = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+      if (!r.ok) {
+        res.status(502).json({ error: `Facilitator returned ${r.status}`, url });
+        return;
+      }
+      const data = await r.json();
+      const kinds = (data as any).kinds || [];
+      res.json({ ok: true, url: config.facilitatorUrl, kinds, cdpAuth: !!config.cdpApiKeyId });
+    } catch (err: any) {
+      res.status(502).json({ error: `Facilitator unreachable: ${err.message}`, url });
+    }
+  });
+
+  // GET /admin/skale/status — wallet address + CREDIT balance
+  router.get("/skale/status", async (_req, res) => {
+    if (!biteService) {
+      res.status(400).json({ error: "SKALE not configured" });
+      return;
+    }
+    try {
+      const status = await biteService.getStatus();
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ error: `SKALE status failed: ${err.message}` });
+    }
+  });
+
+  // POST /admin/skale/test-anchor
+  router.post("/skale/test-anchor", async (_req, res) => {
+    if (!biteService) {
+      res.status(400).json({ error: "SKALE not configured" });
+      return;
+    }
+    try {
+      const intentId = keccak256(toHex("e2e-test-" + Date.now()));
+      const testPayload = new TextEncoder().encode(JSON.stringify({ test: true, ts: Date.now() }));
+      const txHash = await biteService.encryptIntent(intentId, testPayload);
+      res.json({ ok: true, txHash, intentId });
+    } catch (err: any) {
+      console.error("[SKALE] anchor failed:", err.message);
+      res.status(500).json({ error: `SKALE anchor failed: ${err.message}` });
+    }
+  });
+
+  // GET /admin/skale/intent/:intentId — read intent (null if not revealed)
+  router.get("/skale/intent/:intentId", async (req, res) => {
+    if (!biteService) {
+      res.status(400).json({ error: "SKALE not configured" });
+      return;
+    }
+    try {
+      const data = await biteService.getDecryptedIntent(req.params.intentId);
+      if (data === null) {
+        res.json({ revealed: false, data: null });
+      } else {
+        const decoded = new TextDecoder().decode(data);
+        res.json({ revealed: true, data: decoded });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: `Failed to read intent: ${err.message}` });
+    }
+  });
+
+  // POST /admin/skale/reveal/:intentId — trigger markPaid to reveal
+  router.post("/skale/reveal/:intentId", async (req, res) => {
+    if (!biteService) {
+      res.status(400).json({ error: "SKALE not configured" });
+      return;
+    }
+    try {
+      await biteService.triggerReveal(req.params.intentId);
+      res.json({ ok: true, intentId: req.params.intentId });
+    } catch (err: any) {
+      res.status(500).json({ error: `Reveal failed: ${err.message}` });
+    }
+  });
+
+  // GET /admin/reputation/:agentId?min_score=N
+  router.get("/reputation/:agentId", async (req, res) => {
+    if (!reputationService) {
+      res.status(400).json({ error: "ERC-8004 not configured" });
+      return;
+    }
+    try {
+      const result = await reputationService.checkReputation(BigInt(req.params.agentId));
+      // Optional min_score override for testing allow/block threshold
+      const minScoreOverride = req.query.min_score != null ? parseFloat(String(req.query.min_score)) : null;
+      if (minScoreOverride != null && !isNaN(minScoreOverride)) {
+        const allowed = result.count === 0 || result.score >= minScoreOverride;
+        res.json({ ...result, allowed, min_score: minScoreOverride });
+        return;
+      }
+      res.json({ ...result, min_score: config.erc8004MinScore ?? 20 });
+    } catch (err: any) {
+      res.status(500).json({ error: `Reputation check failed: ${err.message}` });
+    }
+  });
+
+  // POST /admin/e2e/payment — real $0.01 USDC payment lifecycle test
+  router.post("/e2e/payment", async (_req, res) => {
+    const t0 = performance.now();
+    const CDP_API_KEY_ID = process.env.CDP_API_KEY_ID;
+    const CDP_API_KEY_SECRET = process.env.CDP_API_KEY_SECRET;
+    const CDP_WALLET_SECRET = process.env.CDP_WALLET_SECRET;
+    // Use the payment system's init-time network, not config.baseNetwork which
+    // may have been mutated by the dashboard config endpoint.
+    const network = paymentSystem.getNetworkName();
+
+    // Skip if CDP credentials missing
+    if (!CDP_API_KEY_ID || !CDP_API_KEY_SECRET) {
+      res.json({ ok: false, skip: true, reason: "Missing CDP_API_KEY_ID or CDP_API_KEY_SECRET" });
+      return;
+    }
+    if (!CDP_WALLET_SECRET || CDP_WALLET_SECRET === "REPLACE_ME_FROM_CDP_PORTAL") {
+      res.json({ ok: false, skip: true, reason: "Missing CDP_WALLET_SECRET — generate one at https://portal.cdp.coinbase.com/products/server-wallets" });
+      return;
+    }
+    if (!config.payToAddress) {
+      res.json({ ok: false, skip: true, reason: "No RT_PAY_TO_ADDRESS configured" });
+      return;
+    }
+
+    const steps: string[] = [];
+    const E2E_TOOL_ID = "__e2e_paid__";
+    const E2E_PATH = "/api/v1/__e2e_paid__";
+    let cleanupDone = false;
+
+    const e2eRoute = {
+      method: "GET",
+      path: E2E_PATH,
+      tool_id: E2E_TOOL_ID,
+      price_usdc: "0.01",
+      provider: {
+        provider_id: "__e2e_payment__",
+        backend_url: "",  // set later
+      },
+    };
+    const cleanup = () => {
+      if (cleanupDone) return;
+      cleanupDone = true;
+      try { routeManager.removeRoute(E2E_TOOL_ID); } catch {}
+      try { paymentSystem.removeRoute(e2eRoute); } catch {}
+    };
+
+    try {
+      // Step 1: Initialize CDP client
+      steps.push("Initializing CDP client");
+      const { CdpClient } = await import("@coinbase/cdp-sdk");
+      const cdp = new CdpClient({
+        apiKeyId: CDP_API_KEY_ID,
+        apiKeySecret: CDP_API_KEY_SECRET,
+        walletSecret: CDP_WALLET_SECRET,
+      });
+
+      // Step 2: Get or create EVM account
+      steps.push("Getting EVM account");
+      const account = await (cdp as any).evm.getOrCreateAccount({
+        name: "routefi-e2e-payer",
+      });
+      const accountAddress: string = account.address;
+
+      // Step 3: Check USDC balance
+      steps.push("Checking USDC balance");
+      const balances = await (cdp as any).evm.listTokenBalances({
+        address: accountAddress,
+        network,
+      });
+      const usdcBalance = balances.balances.find(
+        (b: any) => b.token.symbol?.toUpperCase() === "USDC",
+      );
+      const balanceBefore = usdcBalance
+        ? Number(usdcBalance.amount.amount) / 10 ** usdcBalance.amount.decimals
+        : 0;
+
+      if (balanceBefore < 0.01) {
+        cleanup();
+        res.json({
+          ok: false,
+          skip: true,
+          reason: `USDC balance too low: ${balanceBefore} (need ≥ 0.01)`,
+          account: accountAddress,
+          balance: balanceBefore,
+          network,
+        });
+        return;
+      }
+
+      // Step 4: Add temp $0.01 route pointing to local echo upstream
+      steps.push("Adding temp $0.01 route");
+      // Use the dashboard's e2e-test-upstream as the echo backend (port 3000)
+      const dashboardPort = process.env.DASHBOARD_PORT || "3000";
+      const upstreamUrl = `http://127.0.0.1:${dashboardPort}/e2e-test-upstream`;
+      e2eRoute.provider.backend_url = upstreamUrl;
+
+      routeManager.addRoute(e2eRoute, { skipSsrf: true });
+      paymentSystem.addRoute(e2eRoute);
+
+      // Step 5: Raw fetch without payment → expect 402
+      steps.push("Raw request (expect 402)");
+      const gatewayUrl = `http://localhost:${config.port}`;
+      const dashConfig = configStore.load();
+      const apiKeyHeaders: Record<string, string> = {};
+      if (dashConfig.apiKey) apiKeyHeaders["authorization"] = `Bearer ${dashConfig.apiKey}`;
+      const rawRes = await fetch(`${gatewayUrl}${E2E_PATH}`, { headers: apiKeyHeaders });
+      if (rawRes.status !== 402) {
+        cleanup();
+        const body = await rawRes.text().catch(() => "");
+        res.json({
+          ok: false,
+          error: `Expected 402 but got ${rawRes.status}`,
+          body,
+          steps,
+          elapsed: Math.round(performance.now() - t0),
+        });
+        return;
+      }
+
+      // Step 6: Paid request via wrapFetchWithPayment
+      steps.push("Paying with x402 (wrapFetchWithPayment)");
+      const { x402Client, wrapFetchWithPayment } = await import("@x402/fetch");
+      const { registerExactEvmScheme } = await import("@x402/evm/exact/client");
+      const x402 = new x402Client();
+      registerExactEvmScheme(x402, { signer: account as any });
+
+      const paymentFetch = wrapFetchWithPayment(fetch, x402);
+      const paidRes = await paymentFetch(`${gatewayUrl}${E2E_PATH}`, {
+        method: "GET",
+        headers: { "content-type": "application/json", ...apiKeyHeaders },
+      });
+
+      if (paidRes.status !== 200) {
+        cleanup();
+        const body = await paidRes.text().catch(() => "");
+        res.json({
+          ok: false,
+          error: `Payment request returned ${paidRes.status} (expected 200)`,
+          body,
+          steps,
+          elapsed: Math.round(performance.now() - t0),
+        });
+        return;
+      }
+
+      // Step 7: Decode receipt
+      steps.push("Decoding receipt");
+      const receiptHeader = paidRes.headers.get("x-receipt");
+      let receipt: any = null;
+      if (receiptHeader) {
+        receipt = JSON.parse(Buffer.from(receiptHeader, "base64").toString());
+      }
+
+      // Step 8: Check post-payment balance
+      steps.push("Checking post-payment balance");
+      const postBalances = await (cdp as any).evm.listTokenBalances({
+        address: accountAddress,
+        network,
+      });
+      const postUsdc = postBalances.balances.find(
+        (b: any) => b.token.symbol?.toUpperCase() === "USDC",
+      );
+      const balanceAfter = postUsdc
+        ? Number(postUsdc.amount.amount) / 10 ** postUsdc.amount.decimals
+        : 0;
+
+      // Step 9: Cleanup route
+      cleanup();
+
+      // Build explorer URL
+      const isMainnet = network === "base" || network === "base-mainnet";
+      const explorerBase = isMainnet ? "https://basescan.org" : "https://sepolia.basescan.org";
+      const txHash = receipt?.payment_tx_hash || null;
+      const explorerUrl = txHash ? `${explorerBase}/tx/${txHash}` : null;
+
+      const elapsed = Math.round(performance.now() - t0);
+      res.json({
+        ok: true,
+        account: accountAddress,
+        network,
+        balance_before: balanceBefore,
+        balance_after: balanceAfter,
+        spent: parseFloat((balanceBefore - balanceAfter).toFixed(6)),
+        txHash,
+        explorer: explorerUrl,
+        receipt: receipt ? {
+          request_id: receipt.request_id,
+          tool_id: receipt.tool_id,
+          outcome: receipt.outcome,
+          price_usdc: receipt.price_usdc,
+          payment_tx_hash: receipt.payment_tx_hash,
+          latency_ms: receipt.latency_ms,
+        } : null,
+        steps,
+        elapsed,
+      });
+    } catch (err: any) {
+      cleanup();
+      res.status(500).json({
+        ok: false,
+        error: err.message,
+        steps,
+        elapsed: Math.round(performance.now() - t0),
+      });
+    }
+  });
+
+  // DELETE /admin/blacklist/:address
+  router.delete("/blacklist/:address", (req, res) => {
+    const current = configStore.load();
+    const normalized = req.params.address.toLowerCase();
+    const list = (current.blacklist || []).filter((a: string) => a !== normalized);
+    current.blacklist = list;
+    try {
+      configStore.save(current);
+    } catch (err: any) {
+      res.status(500).json({ error: `Failed to save: ${err.message}` });
+      return;
+    }
+    res.json({ ok: true, blacklist: list });
+  });
+
+  return router;
+}
+
+function persistRoutes(routeManager: RouteManager): void {
+  const routesFile = process.env.RT_ROUTES_FILE;
+  if (routesFile) {
+    try {
+      // Strip internal _skipSsrf flag before persisting
+      const clean = routeManager.getRoutes().map(({ _skipSsrf, ...rest }) => rest);
+      writeFileSync(routesFile, JSON.stringify({ routes: clean }, null, 2));
+    } catch {
+      // Non-fatal
+    }
+  }
+}
+
+function mask(s: string, prefixLen: number, suffixLen: number): string {
+  if (s.length <= prefixLen + suffixLen) return s;
+  return s.slice(0, prefixLen) + "***" + s.slice(-suffixLen);
+}
+
+function formatUptime(ms: number): string {
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ${secs % 60}s`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ${mins % 60}m`;
+}

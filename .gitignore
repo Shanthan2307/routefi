@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.env
+.env.mainnet
+coverage/
+*.tsbuildinfo
+.DS_Store
+
+# Runtime gateway files (generated at startup)
+routes.json
+*.rt-config.json
+rt-config.json
+nul
+
+# Test wallet (private key — never commit)
+test/.wallet.json
+
+# Hardhat build artifacts
+contracts/artifacts/
+contracts/cache/

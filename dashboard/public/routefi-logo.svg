@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 60" fill="none">
+  <defs>
+    <linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="tg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <!-- Circuit lines (left side of R) -->
+  <circle cx="6" cy="18" r="2.5" fill="url(#rg)"/>
+  <circle cx="6" cy="28" r="2.5" fill="url(#rg)"/>
+  <circle cx="6" cy="38" r="2.5" fill="url(#rg)"/>
+  <line x1="8.5" y1="18" x2="22" y2="18" stroke="url(#rg)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="8.5" y1="28" x2="22" y2="28" stroke="url(#rg)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="8.5" y1="38" x2="22" y2="38" stroke="url(#rg)" stroke-width="2" stroke-linecap="round"/>
+  <!-- R shape -->
+  <path d="M22 10 L22 50 M22 10 Q42 10 42 22 Q42 34 22 34 M32 34 L44 50" stroke="url(#rg)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Arrow on R -->
+  <path d="M38 8 L46 16 L38 24" stroke="url(#rg)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- "Route" text -->
+  <text x="56" y="40" font-family="Inter, ui-sans-serif, sans-serif" font-weight="800" font-size="28" fill="white">Route</text>
+  <!-- "fi" in gradient -->
+  <text x="145" y="40" font-family="Inter, ui-sans-serif, sans-serif" font-weight="800" font-size="28" fill="url(#tg)">fi</text>
+</svg>

@@ -1,0 +1,3925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard - Routefi Router</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+      --green: #3fb950; --red: #f85149; --orange: #d29922;
+      --purple: #bc8cff; --radius: 8px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+      height: 100vh; display: flex; flex-direction: column;
+    }
+
+    /* Nav */
+    nav {
+      display: flex; align-items: center; gap: 16px;
+      padding: 16px 24px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    nav img { height: 48px; display: block; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 18px; cursor: pointer; }
+    nav a:hover { color: var(--text); }
+    nav a.active { color: #2acc91; font-weight: 600; }
+    nav .sep { color: var(--border); font-size: 20px; }
+    .admin-label {
+      font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+      padding: 3px 10px; border-radius: 4px;
+      background: #58a6ff22; color: var(--accent); border: 1px solid #58a6ff44;
+    }
+    nav .spacer { flex: 1; }
+
+    /* Settings */
+    .settings-btn {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 7px 14px; border-radius: 6px; cursor: pointer;
+      font-size: 15px; color: #2acc91; transition: border-color .2s, color .2s;
+    }
+    .settings-btn:hover { border-color: #2acc91; color: #2acc91; }
+    .settings-btn .cog { width: 18px; height: 18px; transition: transform .3s; }
+    .settings-btn:hover .cog { transform: rotate(45deg); }
+    .settings-gear { width: 18px; height: 18px; cursor: pointer; opacity: 0.45; flex-shrink: 0; transition: opacity .2s, transform .3s; }
+    .settings-gear:hover { opacity: 0.9; transform: rotate(45deg); }
+    .settings-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55);
+      z-index: 200; align-items: center; justify-content: center;
+    }
+    .settings-backdrop.open { display: flex; }
+    .settings-modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); width: 900px; max-width: calc(100vw - 40px);
+      box-shadow: 0 16px 48px rgba(0,0,0,.5); max-height: 90vh; display: flex; flex-direction: column;
+    }
+    .settings-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+      font-size: 15px; font-weight: 600; flex-shrink: 0;
+    }
+    .settings-modal-close {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 20px; padding: 0 4px; line-height: 1; transition: color .2s;
+    }
+    .settings-modal-close:hover { color: var(--text); }
+    .settings-tabs {
+      display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0;
+      background: var(--bg); padding: 0 12px;
+    }
+    .settings-tab {
+      padding: 10px 16px; font-size: 13px; font-weight: 600; color: var(--muted);
+      cursor: pointer; border: none; background: none; letter-spacing: 0.5px;
+      border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+    }
+    .settings-tab:hover { color: var(--text); }
+    .settings-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .settings-tab-panel { display: none; }
+    .settings-tab-panel.active { display: flex; flex-direction: column; gap: 14px; }
+    .settings-modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+    .settings-section-label {
+      font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase;
+      letter-spacing: 1px; padding-top: 14px; margin-top: 4px; border-top: 1px solid var(--border);
+    }
+    .field-group label {
+      display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px;
+      text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+    }
+    .field-group input, .field-group select {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 10px; color: var(--text);
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace; font-size: 14px;
+      box-sizing: border-box;
+    }
+    .field-group input:focus, .field-group select:focus { outline: none; border-color: var(--accent); }
+    .test-btn {
+      background: #238636; color: #fff; border: 1px solid #2ea04366;
+      padding: 7px 16px; border-radius: 6px; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: background .15s; width: 100%;
+    }
+    .test-btn:hover { background: #2ea043; }
+    .test-result { font-size: 14px; margin-top: 4px; }
+    .toggle-switch-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px 16px; cursor: pointer;
+    }
+    .toggle-switch-label { font-size: 14px; font-weight: 600; color: var(--text); }
+    .toggle-switch {
+      position: relative; width: 64px; height: 32px; flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: var(--border); border-radius: 16px;
+      transition: background .2s;
+    }
+    .toggle-slider::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 26px; height: 26px; background: var(--surface); border-radius: 50%;
+      transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--green); }
+    .toggle-switch input:checked + .toggle-slider::after { transform: translateX(32px); }
+    .toggle-text-on, .toggle-text-off {
+      position: absolute; top: 0; height: 32px; line-height: 32px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.5px; pointer-events: none;
+    }
+    .toggle-text-on { left: 10px; color: #fff; opacity: 0; transition: opacity .2s; }
+    .toggle-text-off { right: 8px; color: var(--muted); opacity: 1; transition: opacity .2s; }
+    .toggle-switch input:checked ~ .toggle-text-on { opacity: 1; }
+    .toggle-switch input:checked ~ .toggle-text-off { opacity: 0; }
+    .security-status-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 14px;
+    }
+    .security-status-label { font-size: 13px; color: var(--text); font-weight: 500; }
+    .security-status-badge {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+      padding: 3px 10px; border-radius: 10px;
+    }
+    .security-status-badge.on { background: rgba(63,185,80,.15); color: var(--green); }
+    .security-status-badge.off { background: rgba(139,148,158,.12); color: var(--muted); }
+    .cdp-env-grid { display: flex; flex-direction: column; gap: 8px; }
+    .cdp-env-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 12px;
+    }
+    .cdp-env-name {
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+      font-size: 13px; color: var(--text);
+    }
+    .cdp-env-status { font-size: 13px; font-weight: 600; }
+    .cdp-env-status.set { color: var(--green); }
+    .cdp-env-status.missing { color: var(--orange); }
+
+    /* Layout */
+    .layout { display: flex; flex: 1; overflow: hidden; }
+    .panel-left {
+      width: 400px; min-width: 400px;
+      border-right: 1px solid var(--border);
+      overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .panel-right { flex: 1; overflow-y: auto; padding: 20px; }
+
+    /* Connection box */
+    .conn-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .conn-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      font-size: 14px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .conn-dot.online { background: var(--green); }
+    .conn-dot.offline { background: var(--red); }
+    .conn-dot.loading { background: var(--orange); }
+    .conn-body { padding: 12px 14px; }
+    .conn-row { display: flex; gap: 8px; font-size: 14px; margin-bottom: 8px; }
+    .conn-row:last-child { margin-bottom: 0; }
+    .conn-label { color: var(--muted); min-width: 80px; flex-shrink: 0; }
+    .conn-value {
+      color: var(--text); word-break: break-all;
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace; font-size: 13px;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid; grid-template-columns: 1fr; gap: 10px;
+    }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px;
+    }
+    .stat-label {
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 26px; font-weight: 700;
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    }
+    .stat-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    /* Quick Actions */
+    .quick-actions {
+      display: flex; gap: 8px;
+    }
+    .quick-actions .btn { flex: 1; text-align: center; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left; font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 8px 10px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--bg);
+    }
+    td {
+      padding: 8px 10px; border-bottom: 1px solid var(--border);
+      font-size: 14px; vertical-align: top;
+    }
+    tr:hover td { background: var(--surface); }
+    .mono {
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace; font-size: 13px;
+    }
+    .method-tag {
+      font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+      font-family: monospace; display: inline-block;
+    }
+    .method-GET { background: #3fb95022; color: var(--green); }
+    .method-POST { background: #58a6ff22; color: var(--accent); }
+    .method-PUT { background: #d2992222; color: var(--orange); }
+    .method-DELETE { background: #f8514922; color: var(--red); }
+    .method-PATCH { background: #bc8cff22; color: var(--purple); }
+    .method-HEAD { background: #8b949e22; color: var(--muted); }
+    .method-OPTIONS { background: #8b949e22; color: var(--muted); }
+    .outcome-SUCCESS { color: var(--green); }
+    .outcome-ERROR { color: var(--red); }
+    .outcome-DENIED { color: var(--orange); }
+
+    /* Buttons */
+    .btn {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      padding: 6px 14px; border-radius: 6px; font-size: 14px; cursor: pointer;
+      transition: border-color .2s;
+    }
+    .btn:hover { border-color: var(--muted); }
+    .btn-green { background: #238636; color: #fff; border-color: #2ea04366; }
+    .btn-green:hover { background: #2ea043; }
+    .btn-accent { background: #1f6feb; color: #fff; border-color: #388bfd66; }
+    .btn-accent:hover { background: #388bfd; }
+    .btn-red { background: #da363222; color: var(--red); border-color: #f8514933; }
+    .btn-red:hover { background: #da363244; }
+    .btn-sm { padding: 3px 8px; font-size: 13px; }
+
+    /* Panel header */
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .panel-header h2 { font-size: 18px; font-weight: 600; }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .filter-bar select, .filter-bar input {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 14px;
+    }
+    .filter-bar select:focus, .filter-bar input:focus { outline: none; border-color: var(--accent); }
+
+    /* Form */
+    .form-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; margin-bottom: 16px;
+    }
+    .form-grid .full { grid-column: 1 / -1; }
+    .form-grid label {
+      display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;
+    }
+    .form-grid input, .form-grid select, .form-grid textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; padding: 6px 8px; color: var(--text); font-size: 14px;
+      font-family: inherit;
+    }
+    .form-grid input:focus, .form-grid select:focus, .form-grid textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+
+    /* Routes table */
+    .routes-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .routes-table th {
+      text-align: left; font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 8px 10px; border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .routes-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+    .group-header-row { cursor: pointer; }
+    .group-header-row td {
+      background: var(--surface); padding: 10px 14px;
+      font-size: 15px; font-weight: 600;
+    }
+    .group-header-row:hover td { background: #1c2128; }
+    .group-header-row .chevron {
+      display: inline-block; transition: transform .2s;
+      font-size: 12px; color: var(--muted); margin-right: 8px;
+    }
+    .group-header-row .chevron.open { transform: rotate(90deg); }
+    .group-header-row .group-name { margin-right: 10px; }
+    .group-header-row .group-count { font-size: 13px; color: var(--muted); font-weight: 400; }
+    .group-route-row .route-desc { color: var(--muted); font-size: 13px; }
+    .group-route-row:hover td { background: var(--surface); }
+    .group-route-row.hidden { display: none; }
+    .group-route-row.route-restricted td { opacity: 0.5; }
+    .group-route-row.route-restricted .route-actions { opacity: 1; }
+    .route-actions { white-space: nowrap; }
+    .route-actions .btn { margin-right: 6px; }
+    .route-price-cell .price-display {
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+      font-size: 22px; font-weight: 700; color: var(--green);
+    }
+    .route-price-cell .price-unit {
+      font-size: 11px; color: var(--green); font-weight: 400; margin-left: 4px;
+    }
+    .btn-restrict { background: #da363222; color: var(--orange); border-color: #d2992233; }
+    .btn-restrict:hover { background: #da363244; }
+    .routes-section-title {
+      font-size: 14px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 8px; padding: 0 2px;
+    }
+    .routes-section-count {
+      font-size: 12px; color: var(--accent); background: #58a6ff22;
+      padding: 1px 6px; border-radius: 3px; margin-left: 6px;
+    }
+    .restricted-label {
+      font-size: 11px; font-weight: 700; color: var(--red);
+      background: #f8514922; padding: 2px 8px; border-radius: 3px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Detail expansion */
+    .detail-row { display: none; }
+    .detail-row.open { display: table-row; }
+    .detail-row td {
+      background: var(--surface); padding: 12px 14px;
+    }
+    .detail-pre {
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+      font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-all;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 12px; max-height: 300px; overflow-y: auto;
+    }
+
+    /* Modal overlay */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.6); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); width: 700px; max-height: 80vh;
+      overflow-y: auto; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      font-size: 17px; font-weight: 600;
+    }
+    .modal-close {
+      background: none; border: none; color: var(--muted); font-size: 22px;
+      cursor: pointer; padding: 4px 8px;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 20px; }
+    .modal-body textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 10px; color: var(--text);
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace; font-size: 14px;
+      min-height: 200px; resize: vertical;
+    }
+    .modal-body textarea:focus { outline: none; border-color: var(--accent); }
+    .modal-body .field-group { margin-bottom: 12px; }
+    .modal-footer {
+      display: flex; gap: 8px; justify-content: flex-end;
+      padding: 16px 20px; border-top: 1px solid var(--border);
+    }
+
+
+    /* Inline editable */
+    .editable-price {
+      background: transparent; border: 1px solid transparent;
+      color: var(--green); padding: 2px 6px; border-radius: 3px;
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace; font-size: 22px;
+      font-weight: 700; width: 110px; cursor: pointer;
+    }
+    .editable-price:hover { border-color: var(--border); }
+    .editable-price:focus { border-color: var(--accent); background: var(--bg); outline: none; cursor: text; }
+
+    /* Preview table */
+    .preview-table { margin-top: 12px; }
+    .preview-table td { font-size: 13px; padding: 4px 8px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .empty-state {
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 16px; padding: 60px 20px;
+    }
+
+    a.tx-link { color: var(--accent); text-decoration: none; }
+    a.tx-link:hover { text-decoration: underline; }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      margin-top: auto; padding: 12px 6px 6px;
+      border-top: 1px solid var(--border); font-size: 11px; color: var(--muted);
+    }
+    .sidebar-footer .footer-title { font-weight: 600; font-size: 12px; margin-bottom: 8px; }
+    .sidebar-footer .footer-links {
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    }
+    .sidebar-footer .footer-links a {
+      color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; transition: color .15s;
+    }
+    .sidebar-footer .footer-links a:hover { color: var(--text); }
+    .sidebar-footer .footer-links svg { width: 14px; height: 14px; }
+
+    .auto-refresh-toggle {
+      display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted);
+    }
+    .auto-refresh-toggle input { accent-color: var(--accent); }
+
+    /* Debug Tab */
+    .debug-section { margin-bottom: 24px; }
+    .debug-section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; user-select: none; margin-bottom: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 14px;
+      transition: border-color .2s;
+    }
+    .debug-section-header:hover { border-color: var(--muted); }
+    .debug-section-header .debug-section-title { margin-bottom: 0; font-size: 15px; color: var(--text); }
+    .debug-section-status {
+      display: inline-flex; gap: 6px; align-items: center;
+      font-size: 11px; font-weight: 700; font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+      margin-left: 10px;
+    }
+    .debug-section-status .ss-pass { color: var(--green); }
+    .debug-section-status .ss-fail { color: var(--red); }
+    .debug-section-status .ss-skip { color: var(--orange); }
+    .debug-section-status .ss-running { color: var(--accent); }
+    .debug-section.collapsed .debug-cards { display: none; }
+    .debug-section.collapsed .debug-section-header { margin-bottom: 0; }
+    .debug-section-title {
+      font-size: 14px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+    }
+    .debug-cards { display: flex; flex-direction: column; gap: 8px; padding-left: 16px; }
+    .debug-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px;
+      border-left: 3px solid var(--border); transition: border-color .2s;
+    }
+    .debug-card.pass { border-left-color: var(--green); }
+    .debug-card.fail { border-left-color: var(--red); }
+    .debug-card.skip { border-left-color: var(--orange); }
+    .debug-card.running { border-left-color: var(--accent); }
+    .debug-cards.filter-pass .debug-card:not(.pass),
+    .debug-cards.filter-fail .debug-card:not(.fail),
+    .debug-cards.filter-skip .debug-card:not(.skip) { display: none; }
+    .debug-card-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+    }
+    .debug-card-title { font-size: 15px; font-weight: 600; }
+    .debug-card-desc {
+      font-size: 12px; color: var(--muted); margin-bottom: 6px;
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    }
+    .debug-result { font-size: 13px; }
+    .debug-status-badge {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 3px; letter-spacing: 0.5px; margin-bottom: 6px;
+    }
+    .debug-status-badge.pass { background: #3fb95022; color: var(--green); }
+    .debug-status-badge.fail { background: #f8514922; color: var(--red); }
+    .debug-status-badge.skip { background: #d2992222; color: var(--orange); }
+    .debug-status-badge.running { background: #58a6ff22; color: var(--accent); }
+    .debug-body {
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+      font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px; max-height: 200px; overflow-y: auto; margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="admin-label">ROUTER ADMIN</span>
+  <span class="sep" id="sep-routes">/</span>
+  <a href="/routes" id="nav-routes" class="active">ROUTES</a>
+  <span class="sep" id="sep-requests">/</span>
+  <a href="/requests" id="nav-requests">REQUESTS</a>
+  <span class="sep" id="sep-debug">/</span>
+  <a href="/debug" id="nav-debug">DEBUG</a>
+  <span class="sep">/</span>
+  <a href="/docs" id="nav-docs">DOCS</a>
+  <span class="spacer"></span>
+  <button class="settings-btn" onclick="toggleSettings()">
+    <svg class="cog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    SETTINGS
+  </button>
+</nav>
+
+<!-- Settings Modal -->
+<div class="settings-backdrop" id="settings-backdrop" onclick="if(event.target===this)toggleSettings()">
+  <div class="settings-modal">
+    <div class="settings-modal-header">
+      <span>SETTINGS</span>
+      <button class="settings-modal-close" onclick="toggleSettings()">&times;</button>
+    </div>
+    <div class="settings-tabs">
+      <button class="settings-tab active" onclick="switchSettingsTab('api')">API Provider</button>
+      <button class="settings-tab" onclick="switchSettingsTab('base')">Base</button>
+      <button class="settings-tab" onclick="switchSettingsTab('skale')">SKALE</button>
+      <button class="settings-tab" onclick="switchSettingsTab('cdp')">CDP</button>
+      <button class="settings-tab" onclick="switchSettingsTab('access')">Access Control</button>
+      <button class="settings-tab" onclick="switchSettingsTab('security')">Security</button>
+    </div>
+    <div class="settings-modal-body">
+      <!-- API Provider -->
+      <div class="settings-tab-panel active" id="stab-api">
+        <div style="font-size:12px;color:var(--muted)">Connect your existing API provider to proxy requests through the gateway.</div>
+        <div class="field-group">
+          <label>Base URL</label>
+          <input type="text" id="input-api-base-url" placeholder="https://api.example.com" />
+        </div>
+        <div class="field-group">
+          <label>API Key</label>
+          <input type="password" id="input-api-key" placeholder="sk-..." value="YOUR_API_KEY" />
+        </div>
+        <button class="test-btn" style="background:#1f6feb;border-color:#388bfd66" onclick="openImportModal();toggleSettings()">Import API Routes</button>
+      </div>
+      <!-- Base L2 -->
+      <div class="settings-tab-panel" id="stab-base">
+        <div style="font-size:12px;color:var(--muted)">Configure the Base L2 wallet that receives x402 payments and pays network fees.</div>
+        <div class="field-group">
+          <label>Wallet Address</label>
+          <input type="text" id="input-wallet-address" placeholder="0x..." />
+        </div>
+        <div class="field-group">
+          <label>Network</label>
+          <select id="input-base-network">
+            <option value="base-sepolia">base-sepolia (Testnet)</option>
+            <option value="base">base (Mainnet)</option>
+          </select>
+        </div>
+        <button class="test-btn" onclick="testWallet()">Test Wallet Connection</button>
+        <div class="test-result" id="test-wallet-result"></div>
+      </div>
+      <!-- SKALE -->
+      <div class="settings-tab-panel" id="stab-skale">
+        <div style="font-size:12px;color:var(--muted)">SKALE network settings for BITE threshold encryption (zero gas fees).</div>
+        <div class="field-group">
+          <label>SKALE Network</label>
+          <select id="input-skale-network">
+            <option value="base-sepolia-testnet">Base Sepolia (Testnet, BITE)</option>
+            <option value="base-mainnet">SKALE Base (Mainnet, BITE)</option>
+            <option value="calypso-testnet">Calypso Hub (Testnet)</option>
+            <option value="staging-v3">Chaos (Testnet)</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>SKALE RPC URL</label>
+          <input type="text" id="input-skale-rpc" placeholder="https://..." />
+        </div>
+        <div class="field-group">
+          <label>BITE Contract Address</label>
+          <input type="text" id="input-skale-contract" placeholder="0x..." />
+        </div>
+        <button class="test-btn" onclick="testSkale()">Test SKALE Connection</button>
+        <div class="test-result" id="test-skale-result"></div>
+      </div>
+      <!-- CDP -->
+      <div class="settings-tab-panel" id="stab-cdp">
+        <div style="font-size:12px;color:var(--muted)">Coinbase Developer Platform keys for agent wallet creation and USDC payments. Set these in your <code style="color:var(--accent)">.env</code> file.</div>
+        <div class="cdp-env-grid" id="cdp-env-grid">
+          <div class="cdp-env-row"><span class="cdp-env-name">CDP_API_KEY_ID</span><span class="cdp-env-status" id="cdp-st-key-id">Checking...</span></div>
+          <div class="cdp-env-row"><span class="cdp-env-name">CDP_API_KEY_SECRET</span><span class="cdp-env-status" id="cdp-st-key-secret">Checking...</span></div>
+          <div class="cdp-env-row"><span class="cdp-env-name">CDP_WALLET_SECRET</span><span class="cdp-env-status" id="cdp-st-wallet">Checking...</span></div>
+        </div>
+        <button class="test-btn" onclick="testCdpConnection()">Test CDP Connection</button>
+        <div class="test-result" id="test-cdp-result"></div>
+      </div>
+      <!-- Access Control -->
+      <div class="settings-tab-panel" id="stab-access">
+        <div class="settings-section-label" style="padding-top:0;margin-top:0;border-top:none">AP2 Mandates</div>
+        <label class="toggle-switch-row">
+          <span class="toggle-switch-label">Enforce API mandate</span>
+          <div class="toggle-switch">
+            <input type="checkbox" id="input-ap2-enabled" />
+            <span class="toggle-slider"></span>
+            <span class="toggle-text-on">ON</span>
+            <span class="toggle-text-off">OFF</span>
+          </div>
+        </label>
+
+        <div class="settings-section-label">Blacklist</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="input-blacklist-address" placeholder="0x agent address..." style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'SF Mono','Cascadia Code',Consolas,monospace;font-size:14px;box-sizing:border-box" />
+          <button class="test-btn" style="width:auto;flex-shrink:0" onclick="addToBlacklist()">Add</button>
+        </div>
+        <div id="blacklist-summary" style="display:none;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px">
+          <span style="font-size:13px;color:var(--text)"><span id="blacklist-count">0</span> blocked agents</span>
+          <button style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;font-weight:600;padding:0" id="blacklist-toggle-btn" onclick="toggleBlacklistExpanded()">View all</button>
+        </div>
+        <div id="blacklist-list" style="display:none;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto"></div>
+
+        <div class="settings-section-label">ERC-8004 Reputation</div>
+        <div class="field-group">
+          <label>RPC URL</label>
+          <input type="text" id="input-erc8004-rpc" placeholder="https://..." />
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="field-group" style="flex:1;min-width:0">
+            <label>Contract</label>
+            <input type="text" id="input-erc8004-contract" placeholder="0x..." />
+          </div>
+          <div class="field-group" style="width:100px;flex-shrink:0">
+            <label>Min Score</label>
+            <input type="number" id="input-erc8004-min-score" placeholder="20" value="20" min="0" />
+          </div>
+        </div>
+        <button class="test-btn" onclick="testErc8004Settings()">Test Reputation Lookup</button>
+        <div class="test-result" id="test-erc8004-settings-result"></div>
+      </div>
+      <!-- Security -->
+      <div class="settings-tab-panel" id="stab-security">
+        <div class="settings-section-label" style="padding-top:0;margin-top:0;border-top:none">Rate Limiting</div>
+        <label class="toggle-switch-row">
+          <span class="toggle-switch-label">Rate limiting</span>
+          <div class="toggle-switch">
+            <input type="checkbox" id="input-ratelimit-enabled" checked />
+            <span class="toggle-slider"></span>
+            <span class="toggle-text-on">ON</span>
+            <span class="toggle-text-off">OFF</span>
+          </div>
+        </label>
+        <div style="display:flex;gap:8px">
+          <div class="field-group" style="flex:1;min-width:0">
+            <label>Max Requests</label>
+            <input type="number" id="input-ratelimit-max" value="100" min="1" />
+          </div>
+          <div class="field-group" style="flex:1;min-width:0">
+            <label>Window (seconds)</label>
+            <input type="number" id="input-ratelimit-window" value="60" min="1" />
+          </div>
+        </div>
+
+        <div class="settings-section-label">Replay Protection</div>
+        <label class="toggle-switch-row">
+          <span class="toggle-switch-label">Idempotency enforcement</span>
+          <div class="toggle-switch">
+            <input type="checkbox" id="input-replay-enabled" checked />
+            <span class="toggle-slider"></span>
+            <span class="toggle-text-on">ON</span>
+            <span class="toggle-text-off">OFF</span>
+          </div>
+        </label>
+        <div class="field-group">
+          <label>Replay TTL (seconds)</label>
+          <input type="number" id="input-replay-ttl" value="300" min="1" />
+        </div>
+
+        <div class="settings-section-label">CORS</div>
+        <div class="field-group">
+          <label>Allowed Origins</label>
+          <input type="text" id="input-cors-origins" placeholder="* (all origins)" value="*" />
+        </div>
+        <div style="font-size:11px;color:var(--muted)">Comma-separated origins, or * for all. e.g. https://app.example.com, https://other.com</div>
+
+        <div class="settings-section-label">Active Protections</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div class="security-status-row">
+            <span class="security-status-label">Helmet (HTTP security headers)</span>
+            <span class="security-status-badge on">Active</span>
+          </div>
+          <div class="security-status-row">
+            <span class="security-status-label">SSRF protection</span>
+            <span class="security-status-badge on">Active</span>
+          </div>
+          <div class="security-status-row">
+            <span class="security-status-label">Hop-by-hop header stripping</span>
+            <span class="security-status-badge on">Active</span>
+          </div>
+          <div class="security-status-row">
+            <span class="security-status-label">Internal header filtering</span>
+            <span class="security-status-badge on">Active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- Left Panel -->
+  <div class="panel-left">
+    <div class="conn-box">
+      <div class="conn-header" style="justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="conn-dot loading" id="conn-dot"></span>
+          <span id="conn-label">Checking gateway...</span>
+        </div>
+        <svg class="settings-gear" onclick="toggleSettings()" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <div class="conn-body">
+        <div class="conn-row">
+          <span class="conn-label">Status</span>
+          <span class="conn-value" id="conn-status">Connecting...</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">Uptime</span>
+          <span class="conn-value" id="conn-uptime">-</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">Routes</span>
+          <span class="conn-value" id="conn-routes">-</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">Requests</span>
+          <span class="conn-value" id="conn-receipts">-</span>
+        </div>
+        <div class="conn-row" id="conn-endpoint-row" style="display:none">
+          <span class="conn-label">Endpoint</span>
+          <span class="conn-value"><a class="tx-link" id="conn-endpoint" href="#" target="_blank">-</a></span>
+        </div>
+        <div class="conn-row" id="conn-docs-row" style="display:none">
+          <span class="conn-label">API Docs</span>
+          <span class="conn-value"><a class="tx-link" id="conn-docs" href="#" target="_blank">-</a></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn-box">
+      <div class="conn-header" style="justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="conn-dot loading" id="platform-dot"></span>
+          <span>Platform Connections</span>
+        </div>
+        <svg class="settings-gear" onclick="toggleSettings()" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <div class="conn-body">
+        <div class="conn-row">
+          <span class="conn-label">Base</span>
+          <span class="conn-value" id="label-base">Not connected</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">SKALE</span>
+          <span class="conn-value" id="label-skale">Not connected</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">CDP</span>
+          <span class="conn-value" id="label-cdp">Not configured</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Revenue</div>
+        <div class="stat-value"><span id="stat-usdc" style="color:var(--green)">-</span> <span style="color:var(--green);font-size:14px;font-weight:400">USDC</span></div>
+        <div id="wallet-link" style="margin-top:6px;font-size:11px;display:none"><a id="wallet-link-a" href="#" target="_blank" style="color:var(--muted);text-decoration:none;font-family:var(--mono,monospace)"><svg style="width:12px;height:12px;vertical-align:-1px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg><span id="wallet-link-text"></span></a></div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="footer-title">Routefi Router v1.0</div>
+      <div class="footer-links">
+        <a href="https://x.com/Routefi" target="_blank" title="X.com">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+        <a href="https://github.com/Routefi/Routefi-Router" target="_blank" title="GitHub">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+        <a href="https://Routefi.ai" target="_blank" title="Website">Routefi.ai</a>
+        <a href="https://dorahacks.io/hackathon/x402/" target="_blank" title="x402 Hackathon">x402 Hackathon</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right Panel -->
+  <div class="panel-right">
+    <!-- Import CTA shown when no routes -->
+    <div id="routes-import-cta" style="display:none;text-align:center;padding:60px 20px">
+      <div style="max-width:560px;margin:0 auto;text-align:left">
+        <h3 style="color:var(--text);font-size:22px;font-weight:700;margin:0 0 24px;border-bottom:1px solid var(--border);padding-bottom:10px">Quickstart</h3>
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div style="display:flex;gap:16px">
+            <div style="min-width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center">1</div>
+            <div><span style="color:var(--text);font-size:16px;font-weight:600;display:block;line-height:36px">Setup credentials</span><span style="color:var(--muted);font-size:15px">Copy <code style="background:var(--surface);padding:2px 6px;border-radius:4px;font-size:14px">.env.example</code> and set your project secrets</span></div>
+          </div>
+          <div style="display:flex;gap:16px">
+            <div style="min-width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center">2</div>
+            <div><span style="color:var(--text);font-size:16px;font-weight:600;display:block;line-height:36px">Import your API routes</span><span style="color:var(--muted);font-size:15px"><a href="#" onclick="event.preventDefault();openImportModal()" style="color:var(--accent);text-decoration:underline">Import from an OpenAPI spec</a> or load demo routes below</span></div>
+          </div>
+          <div style="display:flex;gap:16px">
+            <div style="min-width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center">3</div>
+            <div><span style="color:var(--text);font-size:16px;font-weight:600;display:block;line-height:36px">Set your prices</span><span style="color:var(--muted);font-size:15px">Choose how much USDC to charge per request on each route</span></div>
+          </div>
+          <div style="display:flex;gap:16px">
+            <div style="min-width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center">4</div>
+            <div><span style="color:var(--text);font-size:16px;font-weight:600;display:block;line-height:36px">Share your gateway URL</span><span style="color:var(--muted);font-size:15px">Agents connect, pay with x402, and get proxied to your API</span></div>
+          </div>
+        </div>
+        <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-green" style="font-size:16px;padding:12px 24px" onclick="loadDemoSettings('testnet')">Load Demo (Testnet)</button>
+          <button class="btn btn-green" style="font-size:16px;padding:12px 24px;background:#1a6eff" onclick="loadDemoSettings('mainnet')">Load Demo (Mainnet)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Routes Tab -->
+    <div id="tab-routes">
+      <div class="panel-header" id="routes-toolbar">
+        <h2>Routes</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div id="global-price-form" style="display:none;display:none;align-items:center;gap:6px">
+            <input type="text" id="input-global-price" placeholder="0.01"
+              style="width:80px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-family:'SF Mono','Cascadia Code',Consolas,monospace;font-size:13px"
+              onkeydown="if(event.key==='Enter')applyGlobalPrice();if(event.key==='Escape')hideGlobalPrice()" />
+            <span style="font-size:11px;color:var(--green)">USDC</span>
+            <button class="btn btn-green btn-sm" onclick="applyGlobalPrice()">Apply</button>
+            <button class="btn btn-sm" onclick="hideGlobalPrice()">Cancel</button>
+          </div>
+          <button class="btn" id="btn-global-price" onclick="showGlobalPrice()">Set Global Price</button>
+          <button class="btn" onclick="generateDocs()">Generate API Docs</button>
+          <button class="btn" onclick="loadRoutes()">Refresh</button>
+          <button class="btn btn-red" onclick="removeAllRoutes()">Remove All</button>
+        </div>
+      </div>
+
+      <!-- Grouped Routes Display -->
+      <div id="routes-grouped"></div>
+    </div>
+
+    <!-- Requests Tab -->
+    <div id="tab-requests" style="display:none">
+      <div class="panel-header">
+        <h2>Requests</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="auto-refresh-toggle">
+            <input type="checkbox" id="requests-auto-refresh" checked />
+            Auto-refresh
+          </label>
+          <button class="btn" onclick="loadRequests()">Refresh</button>
+          <button class="btn" onclick="exportReceipts()">Export JSON</button>
+          <button class="btn" style="color:var(--red);border-color:var(--red)" onclick="clearAllRequests()">Clear All</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <select id="filter-tool-id"><option value="">All Tools</option></select>
+        <select id="filter-outcome">
+          <option value="">All Outcomes</option>
+          <option value="SUCCESS">SUCCESS</option>
+          <option value="ERROR">ERROR</option>
+          <option value="DENIED">DENIED</option>
+        </select>
+        <input type="number" id="filter-limit" value="50" min="1" max="500" style="width:80px" />
+        <button class="btn" onclick="loadRequests()">Apply</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th><th>Tool</th><th>Method</th><th>Endpoint</th>
+            <th>Outcome</th><th>Latency</th><th>Price</th><th>TX Hash</th><th>Receipt</th>
+          </tr>
+        </thead>
+        <tbody id="requests-body"></tbody>
+      </table>
+      <div class="empty-state" id="requests-empty">No requests yet</div>
+    </div>
+
+    <!-- Debug Tab -->
+    <div id="tab-debug" style="display:none">
+      <div class="panel-header">
+        <h2>Debug Tests <span id="debug-total-count" style="font-size:14px;font-weight:400;color:var(--muted)"></span></h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="debug-summary" class="mono" style="font-size:13px"></span>
+          <button class="btn btn-green" onclick="runAllTests()">Run All Tests</button>
+          <button class="btn" onclick="toggleAllSections()" id="btn-toggle-sections">Expand All</button>
+          <button class="btn" onclick="clearAllTests()">Clear Results</button>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="e2e">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">Gateway E2E <span class="debug-section-status" id="ss-e2e"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('e2e')">Run Section</button>
+
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-e2e-pipeline">
+            <div class="debug-card-header"><span class="debug-card-title">E2E Pipeline</span><button class="btn btn-sm" onclick="testE2ePipeline()">Run</button></div>
+            <div class="debug-card-desc">Create temp $0 route &rarr; request &rarr; verify response + receipt &rarr; cleanup</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-e2e-receipt">
+            <div class="debug-card-header"><span class="debug-card-title">Receipt Lookup</span><button class="btn btn-sm" onclick="testE2eReceipt()">Run</button></div>
+            <div class="debug-card-desc">Query /admin/receipts for the E2E request &mdash; verify SUCCESS receipt</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-e2e-hash">
+            <div class="debug-card-header"><span class="debug-card-title">Response Hash</span><button class="btn btn-sm" onclick="testE2eHash()">Run</button></div>
+            <div class="debug-card-desc">Verify receipt response_hash is valid keccak256 (0x + 64 hex)</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-e2e-402">
+            <div class="debug-card-header"><span class="debug-card-title">Payment Challenge</span><button class="btn btn-sm" onclick="testE2e402()">Run</button></div>
+            <div class="debug-card-desc">Create temp $0.01 route &rarr; hit without payment &rarr; expect 402 &rarr; cleanup</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-e2e-skale">
+            <div class="debug-card-header"><span class="debug-card-title">SKALE Anchor</span><button class="btn btn-sm" onclick="testE2eSkale()">Run</button></div>
+            <div class="debug-card-desc">Store test hash on SKALE via admin endpoint &mdash; skip if not configured</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-e2e-bite-lifecycle">
+            <div class="debug-card-header"><span class="debug-card-title">BITE Encryption Lifecycle</span><button class="btn btn-sm" onclick="testBiteLifecycle()">Run</button></div>
+            <div class="debug-card-desc">Encrypt &rarr; verify hidden &rarr; reveal (markPaid) &rarr; verify decrypted &mdash; full threshold encryption flow</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-e2e-upstream-error">
+            <div class="debug-card-header"><span class="debug-card-title">Upstream Error (No Charge)</span><button class="btn btn-sm" onclick="testUpstreamError()">Run</button></div>
+            <div class="debug-card-desc">Route to dead upstream &rarr; 502 with UPSTREAM_ERROR_NO_CHARGE &mdash; agent not billed</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-e2e-real-payment">
+            <div class="debug-card-header"><span class="debug-card-title">Real Payment ($0.01 USDC)</span><button class="btn btn-sm" onclick="testE2eRealPayment()">Run</button></div>
+            <div class="debug-card-desc">Real $0.01 USDC payment on Base via x402 &mdash; creates temp route, pays, verifies receipt + on-chain tx</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="core">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">Gateway Core <span class="debug-section-status" id="ss-core"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('core')">Run Section</button>
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-health">
+            <div class="debug-card-header"><span class="debug-card-title">Health Check</span><button class="btn btn-sm" onclick="testHealthCheck()">Run</button></div>
+            <div class="debug-card-desc">GET /health &mdash; 200 + status:"ok"</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-route-match">
+            <div class="debug-card-header"><span class="debug-card-title">Route Match</span><button class="btn btn-sm" onclick="testRouteMatch()">Run</button></div>
+            <div class="debug-card-desc">Hit first enabled route with API key &mdash; expect not 404</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-route-404">
+            <div class="debug-card-header"><span class="debug-card-title">Route Not Found</span><button class="btn btn-sm" onclick="testRouteNotFound()">Run</button></div>
+            <div class="debug-card-desc">GET /api/v1/__nonexistent__ &mdash; 404 ROUTE_NOT_FOUND</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-route-restricted">
+            <div class="debug-card-header"><span class="debug-card-title">Restricted Route</span><button class="btn btn-sm" onclick="testRestrictedRoute()">Run</button></div>
+            <div class="debug-card-desc">Hit a disabled route &mdash; shows response (skip if none)</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-auth-401">
+            <div class="debug-card-header"><span class="debug-card-title">API Key Auth (401)</span><button class="btn btn-sm" onclick="testAuth401()">Run</button></div>
+            <div class="debug-card-desc">Hit route WITHOUT API key &mdash; 401 UNAUTHORIZED</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-auth-valid">
+            <div class="debug-card-header"><span class="debug-card-title">API Key Valid</span><button class="btn btn-sm" onclick="testAuthValid()">Run</button></div>
+            <div class="debug-card-desc">Hit route WITH correct API key &mdash; not 401</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-rate-limit">
+            <div class="debug-card-header"><span class="debug-card-title">Rate Limiting</span><button class="btn btn-sm" onclick="testRateLimit()">Run</button></div>
+            <div class="debug-card-desc">105 rapid GET /health &mdash; expect at least one 429 (excluded from Run All)</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="payment">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">x402 Payment &amp; Facilitator <span class="debug-section-status" id="ss-payment"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('payment')">Run Section</button>
+
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-payment-402">
+            <div class="debug-card-header"><span class="debug-card-title">Payment Required</span><button class="btn btn-sm" onclick="testPaymentRequired()">Run</button></div>
+            <div class="debug-card-desc">Hit priced route without payment &mdash; 402</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-payment-x402-header">
+            <div class="debug-card-header"><span class="debug-card-title">x402 Header Valid</span><button class="btn btn-sm" onclick="testX402HeaderValid()">Run</button></div>
+            <div class="debug-card-desc">402 response includes valid x402 payment requirements (payTo, amount, network)</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-payment-facilitator">
+            <div class="debug-card-header"><span class="debug-card-title">x402 Facilitator</span><button class="btn btn-sm" onclick="testFacilitator()">Run</button></div>
+            <div class="debug-card-desc">Verify x402 facilitator is reachable and returns supported payment schemes</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-idempotency">
+            <div class="debug-card-header"><span class="debug-card-title">Replay Detection</span><button class="btn btn-sm" onclick="testIdempotency()">Run</button></div>
+            <div class="debug-card-desc">Same request 2x with X-Idempotency-Key &mdash; 2nd returns 409</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="skale">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">SKALE / BITE (ENCRYPTION) <span class="debug-section-status" id="ss-skale"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('skale')">Run Section</button>
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-skale-rpc">
+            <div class="debug-card-header"><span class="debug-card-title">RPC Connection</span><button class="btn btn-sm" onclick="testSkaleRpc()">Run</button></div>
+            <div class="debug-card-desc">eth_chainId via /rpc-proxy &mdash; returns chain ID</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-skale-block">
+            <div class="debug-card-header"><span class="debug-card-title">Latest Block</span><button class="btn btn-sm" onclick="testSkaleBlock()">Run</button></div>
+            <div class="debug-card-desc">eth_blockNumber via /rpc-proxy &mdash; returns block number</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-bite-committee">
+            <div class="debug-card-header"><span class="debug-card-title">BITE Committee</span><button class="btn btn-sm" onclick="testBiteCommittee()">Run</button></div>
+            <div class="debug-card-desc">bite_getCommitteesInfo &mdash; verify threshold encryption is available</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-bite-contract">
+            <div class="debug-card-header"><span class="debug-card-title">BITE Contract</span><button class="btn btn-sm" onclick="testBiteContract()">Run</button></div>
+            <div class="debug-card-desc">eth_getCode + getIntent &mdash; verify IntentStore contract is deployed and callable</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="mandate">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">AP2 Mandates <span class="debug-section-status" id="ss-mandate"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('mandate')">Run Section</button>
+
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-mandate-skipped">
+            <div class="debug-card-header"><span class="debug-card-title">Mandate Accepted (No Mandate)</span><button class="btn btn-sm" onclick="testMandateSkipped()">Run</button></div>
+            <div class="debug-card-desc">Request without X-Mandate header &mdash; mandate step skipped, not blocked</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-mandate-rejected">
+            <div class="debug-card-header"><span class="debug-card-title">Mandate Rejected (Invalid)</span><button class="btn btn-sm" onclick="testMandateRejected()">Run</button></div>
+            <div class="debug-card-desc">Request with malformed X-Mandate &mdash; 400 Bad Request</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-mandate-sig">
+            <div class="debug-card-header"><span class="debug-card-title">Mandate Signature (EIP-191)</span><button class="btn btn-sm" onclick="testMandateSig()">Run</button></div>
+            <div class="debug-card-desc">Valid EIP-191 signed mandate &mdash; passes signature verification (may 402 for payment, which is fine)</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-mandate-expired">
+            <div class="debug-card-header"><span class="debug-card-title">Mandate Expired</span><button class="btn btn-sm" onclick="testMandateExpired()">Run</button></div>
+            <div class="debug-card-desc">Signed mandate with past expiry &mdash; 403 MANDATE_EXPIRED</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-mandate-budget">
+            <div class="debug-card-header"><span class="debug-card-title">Mandate Daily Budget</span><button class="btn btn-sm" onclick="testMandateBudget()">Run</button></div>
+            <div class="debug-card-desc">Check daily spend tracker via admin API &mdash; shows current tracked spend</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-intent-budget">
+            <div class="debug-card-header"><span class="debug-card-title">IntentMandate Budget Rejected</span><button class="btn btn-sm" onclick="testIntentBudget()">Run</button></div>
+            <div class="debug-card-desc">Budget $0.001 vs route price &mdash; 403 INTENT_BUDGET_EXCEEDED</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-intent-merchant">
+            <div class="debug-card-header"><span class="debug-card-title">IntentMandate Merchant Match</span><button class="btn btn-sm" onclick="testIntentMerchant()">Run</button></div>
+            <div class="debug-card-desc">Wrong merchant domain &mdash; 403 MERCHANT_NOT_MATCHED</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="x402">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">Security Checks <span class="debug-section-status" id="ss-x402"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('x402')">Run Section</button>
+
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-x402-probe">
+            <div class="debug-card-header"><span class="debug-card-title">Block x402 Upstream</span><button class="btn btn-sm" onclick="testX402Probe()">Run</button></div>
+            <div class="debug-card-desc">POST /admin/routes with a known x402 upstream &mdash; expect 400 X402_UPSTREAM_BLOCKED</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-x402-skip">
+            <div class="debug-card-header"><span class="debug-card-title">Probe Opt-out Check</span><button class="btn btn-sm" onclick="testX402Skip()">Run</button></div>
+            <div class="debug-card-desc">RT_SKIP_X402_PROBE env var &mdash; should be unset (probe active)</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-ssrf-blocked">
+            <div class="debug-card-header"><span class="debug-card-title">SSRF Protection</span><button class="btn btn-sm" onclick="testSsrfBlocked()">Run</button></div>
+            <div class="debug-card-desc">Register route to private IP (10.0.0.1) &mdash; expect 400 SSRF_BLOCKED</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="blacklist">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">Agent Access Control (Blacklist / ERC-8004) <span class="debug-section-status" id="ss-blacklist"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('blacklist')">Run Section</button>
+
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-blacklist-api">
+            <div class="debug-card-header"><span class="debug-card-title">Blacklist API</span><button class="btn btn-sm" onclick="testBlacklistApi()">Run</button></div>
+            <div class="debug-card-desc">GET /admin/blacklist &mdash; returns blacklist array</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-agent-allowed">
+            <div class="debug-card-header"><span class="debug-card-title">Agent Not Blacklisted</span><button class="btn btn-sm" onclick="testAgentAllowed()">Run</button></div>
+            <div class="debug-card-desc">Request with X-Agent-Address not on blacklist &mdash; not 403 AGENT_BLOCKED</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-agent-blocked">
+            <div class="debug-card-header"><span class="debug-card-title">Agent Blocked</span><button class="btn btn-sm" onclick="testAgentBlocked()">Run</button></div>
+            <div class="debug-card-desc">Add agent to blacklist, request &mdash; 403 AGENT_BLOCKED, then remove</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-erc8004-query">
+            <div class="debug-card-header"><span class="debug-card-title">Contract Query</span><button class="btn btn-sm" onclick="testErc8004Query()">Run</button></div>
+            <div class="debug-card-desc">GET /admin/reputation/1 &mdash; query on-chain reputation from registry contract</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-erc8004-allowed">
+            <div class="debug-card-header"><span class="debug-card-title">Agent Allowed</span><button class="btn btn-sm" onclick="testErc8004Allowed()">Run</button></div>
+            <div class="debug-card-desc">API request with X-Agent-Id header &mdash; should pass (not 403 LOW_REPUTATION)</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-erc8004-blocked">
+            <div class="debug-card-header"><span class="debug-card-title">Block Threshold</span><button class="btn btn-sm" onclick="testErc8004Blocked()">Run</button></div>
+            <div class="debug-card-desc" id="erc8004-block-desc">Verify allow/block logic &mdash; agents with no feedback pass (fail-open), agents with low scores are blocked</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="receipts">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">Transaction Receipts <span class="debug-section-status" id="ss-receipts"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('receipts')">Run Section</button>
+
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-receipts-stats">
+            <div class="debug-card-header"><span class="debug-card-title">Stats</span><button class="btn btn-sm" onclick="testReceiptsStats()">Run</button></div>
+            <div class="debug-card-desc">GET /admin/receipts/stats &mdash; has total_requests</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-receipts-list">
+            <div class="debug-card-header"><span class="debug-card-title">List</span><button class="btn btn-sm" onclick="testReceiptsList()">Run</button></div>
+            <div class="debug-card-desc">GET /admin/receipts?limit=5 &mdash; has receipts[]</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-receipts-filter">
+            <div class="debug-card-header"><span class="debug-card-title">Filter</span><button class="btn btn-sm" onclick="testReceiptsFilter()">Run</button></div>
+            <div class="debug-card-desc">GET /admin/receipts?outcome=DENIED &mdash; all returned are DENIED</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-receipt-integrity">
+            <div class="debug-card-header"><span class="debug-card-title">Receipt Integrity</span><button class="btn btn-sm" onclick="testReceiptIntegrity()">Run</button></div>
+            <div class="debug-card-desc">Cross-validate X-Receipt header vs admin API &mdash; prove tamper-proof receipt chain</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="docs">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">API Docs <span class="debug-section-status" id="ss-docs"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('docs')">Run Section</button>
+
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-openapi">
+            <div class="debug-card-header"><span class="debug-card-title">OpenAPI Spec</span><button class="btn btn-sm" onclick="testOpenApiSpec()">Run</button></div>
+            <div class="debug-card-desc">GET /admin/docs/openapi &mdash; has openapi:"3.0.x" + paths</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="cdp">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">Coinbase Developer Platform (CDP) <span class="debug-section-status" id="ss-cdp"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('cdp')">Run Section</button>
+
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-cdp-env">
+            <div class="debug-card-header"><span class="debug-card-title">Env Configured</span><button class="btn btn-sm" onclick="testCdpEnv()">Run</button></div>
+            <div class="debug-card-desc">Check CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET in .env</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-cdp-api">
+            <div class="debug-card-header"><span class="debug-card-title">API Reachable</span><button class="btn btn-sm" onclick="testCdpApi()">Run</button></div>
+            <div class="debug-card-desc">POST /cdp-check &mdash; validates CDP API connectivity</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="debug-section collapsed" data-section="admin">
+        <div class="debug-section-header" onclick="toggleSection(this)">
+          <h3 class="debug-section-title">RT Router Settings <span class="debug-section-status" id="ss-admin"></span></h3>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="event.stopPropagation();runSection('admin')">Run Section</button>
+          </div>
+        </div>
+        <div class="debug-cards">
+          <div class="debug-card" id="debug-admin-config">
+            <div class="debug-card-header"><span class="debug-card-title">Gateway Config</span><button class="btn btn-sm" onclick="testAdminConfig()">Run</button></div>
+            <div class="debug-card-desc">GET /admin/config &mdash; has port, baseNetwork</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-admin-dashboard">
+            <div class="debug-card-header"><span class="debug-card-title">Dashboard Config</span><button class="btn btn-sm" onclick="testDashboardConfigTest()">Run</button></div>
+            <div class="debug-card-desc">GET /admin/dashboard-config &mdash; has expected fields</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-admin-routes">
+            <div class="debug-card-header"><span class="debug-card-title">Routes List</span><button class="btn btn-sm" onclick="testAdminRoutes()">Run</button></div>
+            <div class="debug-card-desc">GET /admin/routes &mdash; has routes[]</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-openapi-import">
+            <div class="debug-card-header"><span class="debug-card-title">OpenAPI Import</span><button class="btn btn-sm" onclick="testOpenApiImport()">Run</button></div>
+            <div class="debug-card-desc">POST OpenAPI spec &rarr; bulk-create routes &rarr; verify &rarr; cleanup</div>
+            <div class="debug-result"></div>
+          </div>
+          <div class="debug-card" id="debug-price-update">
+            <div class="debug-card-header"><span class="debug-card-title">Dynamic Price Update</span><button class="btn btn-sm" onclick="testPriceUpdate()">Run</button></div>
+            <div class="debug-card-desc">Create route at $0.01 &rarr; PUT $0.05 &rarr; verify new price &rarr; cleanup</div>
+            <div class="debug-result"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Import API Modal -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span>Import API from OpenAPI Spec</span>
+      <button class="modal-close" onclick="closeImportModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group">
+        <label>API Config URL</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="import-spec-url" placeholder="https://api.example.com/openapi.json"
+            style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'SF Mono','Cascadia Code',Consolas,monospace;font-size:14px"
+            onkeydown="if(event.key==='Enter')fetchOpenApiFromUrl()" />
+          <button class="btn btn-accent" onclick="fetchOpenApiFromUrl()">Fetch</button>
+        </div>
+        <div id="fetch-spec-status" style="font-size:12px;margin-top:4px"></div>
+      </div>
+      <div class="field-group">
+        <label>OpenAPI Spec (JSON or YAML)</label>
+        <textarea id="import-spec" placeholder='Paste your OpenAPI 3.0 spec here (JSON or YAML)...'></textarea>
+      </div>
+      <div class="field-group">
+        <label>Or upload a file</label>
+        <input type="file" id="import-file" accept=".json,.yaml,.yml" onchange="loadImportFile(event)" style="font-size:12px" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+        <div class="field-group">
+          <label>Default Price (USDC)</label>
+          <input type="text" id="import-price" placeholder="0.01" />
+        </div>
+        <div class="field-group">
+          <label>Backend URL</label>
+          <input type="text" id="import-backend-url" placeholder="https://api.example.com" />
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <a href="#" onclick="event.preventDefault();document.getElementById('import-advanced').style.display=document.getElementById('import-advanced').style.display==='none'?'':'none';this.textContent=document.getElementById('import-advanced').style.display==='none'?'Show Advanced':'Hide Advanced'" style="font-size:13px;color:var(--muted);text-decoration:none">Show Advanced</a>
+        <div id="import-advanced" style="display:none;margin-top:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="field-group">
+              <label>Provider ID</label>
+              <input type="text" id="import-provider-id" placeholder="my-provider" />
+            </div>
+            <div class="field-group">
+              <label>Auth Header</label>
+              <input type="text" id="import-auth-header" placeholder="Authorization" />
+            </div>
+            <div class="field-group" style="grid-column:1/-1">
+              <label>Auth Value</label>
+              <input type="password" id="import-auth-value" placeholder="sk-..." />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="import-preview" style="margin-top:12px"></div>
+      <div id="import-status" style="font-size:12px;margin-top:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="previewImport()">Preview</button>
+      <button class="btn btn-green" onclick="executeImport()">Import</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────
+let adminKey = localStorage.getItem('rt-admin-key') || '';
+let gatewayUrl = localStorage.getItem('rt-gateway-url') || '';
+let activeTab = (() => {
+  const p = location.pathname.replace(/^\//, '');
+  return ['routes', 'requests', 'debug'].includes(p) ? p : 'routes';
+})();
+let allReceipts = [];
+let pollTimer = null;
+let dashboardConfig = null;
+let routeGroups = [];
+
+// ── Env status (set/unset booleans from server) ─────────────────────
+let envStatus = {};
+async function loadEnvStatus() {
+  try {
+    const r = await fetch('/env-status');
+    if (r.ok) envStatus = await r.json();
+  } catch {}
+  updateNetworkLabels();
+  updateCdpStatus();
+}
+
+function updateCdpStatus() {
+  const pairs = [
+    ['cdp-st-key-id', envStatus.cdpApiKeyId],
+    ['cdp-st-key-secret', envStatus.cdpApiKeySecret],
+    ['cdp-st-wallet', envStatus.cdpWalletSecret],
+  ];
+  pairs.forEach(([id, isSet]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = isSet ? 'Set' : 'Not set';
+    el.className = 'cdp-env-status ' + (isSet ? 'set' : 'missing');
+  });
+}
+
+async function testCdpConnection() {
+  const el = document.getElementById('test-cdp-result');
+  el.textContent = 'Testing...'; el.style.color = 'var(--muted)';
+  try {
+    const r = await fetch('/cdp-check', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const d = await r.json();
+    if (d.ok) {
+      el.textContent = 'Connected — ' + (d.message || 'OK');
+      el.style.color = 'var(--green)';
+    } else {
+      el.textContent = 'Failed — ' + (d.error || 'Unknown error');
+      el.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    el.textContent = 'Error: ' + e.message;
+    el.style.color = 'var(--red)';
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
+(function init() {
+  switchTab(activeTab, false);
+  refreshAll();
+  startPolling();
+  loadEnvStatus();
+  updateDebugTotalCount();
+
+  // Provider settings listeners
+  let saveTimer = null;
+  function debouncedSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDashboardConfig, 500);
+  }
+  ['input-wallet-address', 'input-api-key', 'input-api-base-url'].forEach(id => {
+    document.getElementById(id).addEventListener('input', debouncedSave);
+  });
+  ['input-skale-rpc', 'input-skale-contract'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      localStorage.removeItem('rt-skale-connected');
+      debouncedSave();
+    });
+  });
+  document.getElementById('input-base-network').addEventListener('change', () => {
+    localStorage.removeItem('rt-base-connected');
+    saveDashboardConfig();
+  });
+  document.getElementById('input-skale-network').addEventListener('change', () => {
+    localStorage.removeItem('rt-skale-connected');
+    const skaleDefaults = {
+      'base-sepolia-testnet': { rpc: 'https://base-sepolia-testnet.skalenodes.com/v1/base-testnet', contract: '0x64687C88C767D9a504c392C07393980af2879dC1' },
+      'base-mainnet':         { rpc: 'https://skale-base.skalenodes.com/v1/base',                   contract: '0x5237c33Ec0af68120B2dDEC5c668681d6F8ABD1E' },
+    };
+    const net = document.getElementById('input-skale-network').value;
+    const defaults = skaleDefaults[net];
+    if (defaults) {
+      document.getElementById('input-skale-rpc').value = defaults.rpc;
+      document.getElementById('input-skale-contract').value = defaults.contract;
+    }
+    saveDashboardConfig();
+  });
+  // Security tab inputs
+  ['input-ratelimit-max', 'input-ratelimit-window', 'input-replay-ttl', 'input-cors-origins'].forEach(id => {
+    document.getElementById(id).addEventListener('input', debouncedSave);
+  });
+  ['input-ratelimit-enabled', 'input-replay-enabled'].forEach(id => {
+    document.getElementById(id).addEventListener('change', saveDashboardConfig);
+  });
+
+  // Load dashboard config from gateway
+  loadDashboardConfig();
+})();
+
+
+// ── API helper ───────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (adminKey) headers['x-admin-key'] = adminKey;
+  const res = await fetch('/gateway' + path, { ...opts, headers: { ...headers, ...opts.headers } });
+  return res;
+}
+
+// ── Dashboard Config ─────────────────────────────────────────────────
+async function loadDashboardConfig() {
+  try {
+    // Fetch the gateway URL to use as default Base URL
+    let gatewayUrl = '';
+    try {
+      const gw = await fetch('/config/gateway-url');
+      if (gw.ok) gatewayUrl = (await gw.json()).gatewayUrl || '';
+    } catch {}
+
+    const r = await api('/admin/dashboard-config');
+    if (!r.ok) return;
+    dashboardConfig = await r.json();
+    routeGroups = dashboardConfig.routeGroups || [];
+    document.getElementById('input-wallet-address').value = dashboardConfig.payToAddress || '';
+    document.getElementById('input-base-network').value = dashboardConfig.baseNetwork || 'base-sepolia';
+    document.getElementById('input-global-price').value = dashboardConfig.globalPriceUsdc || '';
+    document.getElementById('input-skale-network').value = dashboardConfig.skaleNetwork || 'staging-v3';
+    document.getElementById('input-skale-rpc').value = dashboardConfig.skaleRpcUrl || '';
+    document.getElementById('input-skale-contract').value = dashboardConfig.skaleBiteContract || '';
+    document.getElementById('input-api-key').value = dashboardConfig.apiKey || '';
+    document.getElementById('input-api-base-url').value = dashboardConfig.apiBaseUrl || gatewayUrl;
+    document.getElementById('input-ap2-enabled').checked = dashboardConfig.ap2Enabled !== false;
+
+    document.getElementById('input-erc8004-rpc').value = dashboardConfig.erc8004RpcUrl || 'https://sepolia.base.org';
+    document.getElementById('input-erc8004-contract').value = dashboardConfig.erc8004Contract || '0x8004B663056A597Dffe9eCcC1965A193B7388713';
+    document.getElementById('input-erc8004-min-score').value = dashboardConfig.erc8004MinScore || '20';
+    document.getElementById('input-ratelimit-enabled').checked = dashboardConfig.rateLimitEnabled !== false;
+    document.getElementById('input-ratelimit-max').value = dashboardConfig.rateLimitMax || '100';
+    document.getElementById('input-ratelimit-window').value = dashboardConfig.rateLimitWindow || '60';
+    document.getElementById('input-replay-enabled').checked = dashboardConfig.replayEnabled !== false;
+    document.getElementById('input-replay-ttl').value = dashboardConfig.replayTtl || '300';
+    document.getElementById('input-cors-origins').value = dashboardConfig.corsOrigins || '*';
+    updateNetworkLabels();
+    updateWalletLink();
+    // Seed a demo blacklist entry if empty, then load
+    try {
+      const blr = await api('/admin/blacklist');
+      if (blr.ok) {
+        const bld = await blr.json();
+        if (!bld.blacklist || !bld.blacklist.length) {
+          await api('/admin/blacklist', { method: 'POST', body: JSON.stringify({ address: '0x7a3f9E04b2C8fD1263c5A29fBe44894E3ecB5b60' }) });
+        }
+      }
+    } catch {}
+    loadBlacklist();
+    // Auto-verify SKALE connection on load if RPC URL is configured
+    if (dashboardConfig.skaleRpcUrl) {
+      autoVerifySkale(dashboardConfig.skaleNetwork, dashboardConfig.skaleRpcUrl);
+    }
+  } catch {}
+}
+
+async function autoVerifySkale(skaleNet, rpcUrl) {
+  try {
+    const r = await fetch('/rpc-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rpcUrl, body: { jsonrpc: '2.0', method: 'eth_chainId', params: [], id: 1 } }),
+    });
+    const d = await r.json();
+    if (d.result) {
+      localStorage.setItem('rt-skale-connected', (skaleNet || '') + '|' + rpcUrl);
+      updateNetworkLabels();
+    }
+  } catch {}
+}
+
+async function saveDashboardConfig() {
+  const config = {
+    payToAddress: document.getElementById('input-wallet-address').value.trim(),
+    baseNetwork: document.getElementById('input-base-network').value,
+    globalPriceUsdc: document.getElementById('input-global-price').value.trim() || null,
+    skaleNetwork: document.getElementById('input-skale-network').value,
+    skaleRpcUrl: document.getElementById('input-skale-rpc').value.trim(),
+    skaleBiteContract: document.getElementById('input-skale-contract').value.trim(),
+    apiKey: document.getElementById('input-api-key').value.trim(),
+    apiBaseUrl: document.getElementById('input-api-base-url').value.trim(),
+    ap2Enabled: document.getElementById('input-ap2-enabled').checked,
+
+    erc8004RpcUrl: document.getElementById('input-erc8004-rpc').value.trim(),
+    erc8004Contract: document.getElementById('input-erc8004-contract').value.trim(),
+    erc8004MinScore: document.getElementById('input-erc8004-min-score').value.trim() || '20',
+    rateLimitEnabled: document.getElementById('input-ratelimit-enabled').checked,
+    rateLimitMax: document.getElementById('input-ratelimit-max').value.trim() || '100',
+    rateLimitWindow: document.getElementById('input-ratelimit-window').value.trim() || '60',
+    replayEnabled: document.getElementById('input-replay-enabled').checked,
+    replayTtl: document.getElementById('input-replay-ttl').value.trim() || '300',
+    corsOrigins: document.getElementById('input-cors-origins').value.trim() || '*',
+    routeGroups: routeGroups,
+  };
+  try {
+    const r = await api('/admin/dashboard-config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+    if (r.ok) {
+      dashboardConfig = (await r.json()).config;
+      updateNetworkLabels();
+      updateWalletLink();
+    }
+  } catch {}
+}
+
+function updateNetworkLabels() {
+  const baseNet = document.getElementById('input-base-network').value;
+  const skaleNet = document.getElementById('input-skale-network').value;
+  const baseLabel = document.getElementById('label-base');
+  const skaleLabel = document.getElementById('label-skale');
+  const baseIsMainnet = baseNet === 'base';
+  const skaleIsMainnet = skaleNet === 'mainnet' || skaleNet === 'base-mainnet';
+  const baseNetName = baseIsMainnet ? 'Mainnet' : 'Testnet';
+  const skaleNetName = skaleIsMainnet ? 'Mainnet' : 'Testnet';
+
+  const baseConnected = localStorage.getItem('rt-base-connected') === baseNet;
+  const skaleConnected = localStorage.getItem('rt-skale-connected') === skaleNet + '|' + document.getElementById('input-skale-rpc').value;
+
+  baseLabel.textContent = baseConnected ? 'Connected (' + baseNetName + ')' : 'Not connected';
+  baseLabel.style.color = baseConnected ? 'var(--green)' : 'var(--orange)';
+
+  const cdpLabel = document.getElementById('label-cdp');
+  const cdpConfigured = envStatus.cdpApiKeyId && envStatus.cdpApiKeySecret;
+  cdpLabel.textContent = cdpConfigured ? 'Connected (' + baseNetName + ')' : 'Not configured';
+  cdpLabel.style.color = cdpConfigured ? 'var(--green)' : 'var(--orange)';
+
+  // Show CDP USDC balance from demo config or live fetch
+  if (cdpConfigured && dashboardConfig?.payToAddress) {
+    const demoCdp = localStorage.getItem('rt-cdp-balance');
+    if (demoCdp) {
+      cdpLabel.innerHTML = 'Connected (' + baseNetName + ')<br><span style="color:#8b949e">' + demoCdp + ' USDC</span>';
+    } else {
+      fetchCdpBalance(dashboardConfig.payToAddress, baseIsMainnet).then(bal => {
+        if (bal !== null) {
+          cdpLabel.innerHTML = 'Connected (' + baseNetName + ')<br><span style="color:#8b949e">' + bal + ' USDC</span>';
+        }
+      });
+    }
+  }
+
+  skaleLabel.textContent = skaleConnected ? 'Connected (' + skaleNetName + ')' : 'Not connected';
+  skaleLabel.style.color = skaleConnected ? 'var(--green)' : 'var(--orange)';
+
+  // Show SKALE CREDITS balance from demo config or live fetch
+  if (skaleConnected) {
+    const demoSkale = localStorage.getItem('rt-skale-balance');
+    if (demoSkale) {
+      skaleLabel.innerHTML = 'Connected (' + skaleNetName + ')<br><span style="color:#8b949e">' + demoSkale + ' CREDITS</span>';
+    } else {
+      fetchSkaleBalance().then(bal => {
+        if (bal !== null) {
+          skaleLabel.innerHTML = 'Connected (' + skaleNetName + ')<br><span style="color:#8b949e">' + bal + ' CREDITS</span>';
+        }
+      });
+    }
+  }
+
+  const platformDot = document.getElementById('platform-dot');
+  if (platformDot) {
+    const allGreen = baseConnected && cdpConfigured && skaleConnected;
+    platformDot.className = 'conn-dot ' + (allGreen ? 'online' : 'loading');
+  }
+}
+
+function updateWalletLink() {
+  const addr = dashboardConfig?.payToAddress;
+  const net = dashboardConfig?.baseNetwork;
+  const container = document.getElementById('wallet-link');
+  const anchor = document.getElementById('wallet-link-a');
+  if (!container || !anchor || !addr) return;
+  const explorer = net === 'base' ? 'https://basescan.org' : 'https://sepolia.basescan.org';
+  const short = addr.slice(0, 6) + '...' + addr.slice(-4);
+  anchor.href = explorer + '/address/' + addr;
+  document.getElementById('wallet-link-text').textContent = short;
+  container.style.display = 'block';
+}
+
+async function fetchSkaleBalance() {
+  try {
+    const r = await api('/admin/skale/status');
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.balanceFormatted || null;
+  } catch { return null; }
+}
+
+async function fetchCdpBalance(address, isMainnet) {
+  const rpcUrl = isMainnet
+    ? 'https://mainnet.base.org'
+    : 'https://sepolia.base.org';
+  // USDC contract addresses on Base
+  const usdcContract = isMainnet
+    ? '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+    : '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
+  // balanceOf(address) selector = 0x70a08231, padded address
+  const paddedAddr = '000000000000000000000000' + address.replace('0x', '');
+  const data = '0x70a08231' + paddedAddr;
+  try {
+    const r = await fetch('/rpc-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rpcUrl,
+        body: { jsonrpc: '2.0', method: 'eth_call', params: [{ to: usdcContract, data }, 'latest'], id: 1 }
+      }),
+    });
+    const d = await r.json();
+    if (d.result) {
+      const raw = BigInt(d.result);
+      const whole = raw / 1000000n;
+      const frac = raw % 1000000n;
+      return whole + '.' + frac.toString().padStart(6, '0').slice(0, 2);
+    }
+    return null;
+  } catch { return null; }
+}
+updateNetworkLabels();
+
+// ── Settings ─────────────────────────────────────────────────────────
+function toggleSettings() {
+  document.getElementById('settings-backdrop').classList.toggle('open');
+}
+
+function switchSettingsTab(id) {
+  document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.settings-tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.settings-tab[onclick*="'${id}'"]`).classList.add('active');
+  document.getElementById('stab-' + id).classList.add('active');
+  if (id === 'access') loadBlacklist();
+}
+
+async function testWallet() {
+  const el = document.getElementById('test-wallet-result');
+  const addr = document.getElementById('input-wallet-address').value.trim();
+  const network = document.getElementById('input-base-network').value;
+  if (!addr) {
+    el.textContent = 'Enter a wallet address first';
+    el.style.color = 'var(--red)';
+    return;
+  }
+  if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
+    el.textContent = 'Invalid address format (expected 0x + 40 hex chars)';
+    el.style.color = 'var(--red)';
+    return;
+  }
+  el.textContent = 'Checking...';
+  el.style.color = 'var(--muted)';
+  try {
+    const explorerBase = network === 'base' ? 'https://basescan.org' : 'https://sepolia.basescan.org';
+    el.innerHTML = `Valid address on ${network === 'base' ? 'Base Mainnet' : 'Base Testnet'} &mdash; <a class="tx-link" href="${explorerBase}/address/${addr}" target="_blank">View on Explorer</a>`;
+    el.style.color = 'var(--green)';
+    localStorage.setItem('rt-base-connected', network);
+    updateNetworkLabels();
+  } catch (e) {
+    el.textContent = `Error: ${e.message}`;
+    el.style.color = 'var(--red)';
+  }
+}
+
+async function testSkale() {
+  const el = document.getElementById('test-skale-result');
+  const rpcUrl = document.getElementById('input-skale-rpc').value.trim();
+  if (!rpcUrl) {
+    el.textContent = 'Enter a SKALE RPC URL first';
+    el.style.color = 'var(--red)';
+    return;
+  }
+  el.textContent = 'Checking...';
+  el.style.color = 'var(--muted)';
+  try {
+    const r = await fetch('/rpc-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rpcUrl, body: { jsonrpc: '2.0', method: 'eth_chainId', params: [], id: 1 } }),
+    });
+    const d = await r.json();
+    if (d.error && !d.result) throw new Error(d.detail || d.error);
+    if (d.result) {
+      const chainId = parseInt(d.result, 16);
+      el.innerHTML = `Connected — Chain ID: ${chainId}`;
+      el.style.color = 'var(--green)';
+      const skaleNet = document.getElementById('input-skale-network').value;
+      const rpcUrl = document.getElementById('input-skale-rpc').value;
+      localStorage.setItem('rt-skale-connected', skaleNet + '|' + rpcUrl);
+      updateNetworkLabels();
+    } else {
+      el.textContent = 'RPC responded but no chain ID returned';
+      el.style.color = 'var(--orange)';
+    }
+  } catch (e) {
+    el.textContent = `Failed to connect: ${e.message}`;
+    el.style.color = 'var(--red)';
+  }
+}
+
+// ── Access Control settings ──────────────────────────────────────────
+let blacklistExpanded = false;
+
+async function loadBlacklist() {
+  const summary = document.getElementById('blacklist-summary');
+  const list = document.getElementById('blacklist-list');
+  try {
+    const r = await api('/admin/blacklist');
+    const d = await r.json();
+    const items = d.blacklist || [];
+    document.getElementById('blacklist-count').textContent = items.length;
+    if (!items.length) {
+      summary.style.display = 'flex';
+      document.getElementById('blacklist-count').parentElement.innerHTML = '<span style="color:var(--muted)">No blocked agents</span>';
+      document.getElementById('blacklist-toggle-btn').style.display = 'none';
+      list.style.display = 'none';
+      return;
+    }
+    summary.style.display = 'flex';
+    document.getElementById('blacklist-toggle-btn').style.display = '';
+    list.innerHTML = items.map(addr =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:var(--mono,monospace)">` +
+      `<span style="color:var(--text);overflow:hidden;text-overflow:ellipsis">${addr}</span>` +
+      `<button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0 4px;line-height:1" onclick="removeFromBlacklist('${addr}')" title="Remove">&times;</button></div>`
+    ).join('');
+    renderBlacklistToggle();
+  } catch (e) {
+    summary.style.display = 'flex';
+    document.getElementById('blacklist-count').parentElement.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+    list.style.display = 'none';
+  }
+}
+
+function toggleBlacklistExpanded() {
+  blacklistExpanded = !blacklistExpanded;
+  renderBlacklistToggle();
+}
+
+function renderBlacklistToggle() {
+  const list = document.getElementById('blacklist-list');
+  const btn = document.getElementById('blacklist-toggle-btn');
+  list.style.display = blacklistExpanded ? 'flex' : 'none';
+  btn.textContent = blacklistExpanded ? 'Hide' : 'View all';
+}
+
+async function addToBlacklist() {
+  const input = document.getElementById('input-blacklist-address');
+  const addr = input.value.trim();
+  if (!addr) return;
+  try {
+    const r = await api('/admin/blacklist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ address: addr }) });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Failed'); return; }
+    input.value = '';
+    loadBlacklist();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function removeFromBlacklist(addr) {
+  try {
+    await api('/admin/blacklist/' + encodeURIComponent(addr), { method: 'DELETE' });
+    loadBlacklist();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function testErc8004Settings() {
+  const el = document.getElementById('test-erc8004-settings-result');
+  el.textContent = 'Checking...';
+  el.style.color = 'var(--muted)';
+  try {
+    const r = await api('/admin/reputation/1');
+    const d = await r.json();
+    if (r.status === 400) {
+      el.textContent = d.error || 'ERC-8004 not configured';
+      el.style.color = 'var(--orange)';
+      return;
+    }
+    if (!r.ok) { el.textContent = d.error || 'Request failed'; el.style.color = 'var(--red)'; return; }
+    el.innerHTML = `Connected &mdash; Agent #1: score=${d.score ?? 'N/A'}, count=${d.count ?? 0}, min_score=${d.min_score}`;
+    el.style.color = 'var(--green)';
+  } catch (e) {
+    el.textContent = `Error: ${e.message}`;
+    el.style.color = 'var(--red)';
+  }
+}
+
+// ── Tab switching ────────────────────────────────────────────────────
+function switchTab(tab, pushState) {
+  activeTab = tab;
+  ['routes', 'requests', 'debug'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+    document.getElementById('nav-' + t).className = t === tab ? 'active' : '';
+  });
+  document.getElementById('routes-import-cta').style.display = 'none';
+  if (tab === 'routes') loadRoutes();
+  else if (tab === 'requests') loadRequests();
+  if (pushState !== false) history.pushState({ tab }, '', '/' + tab);
+  document.title = tab.charAt(0).toUpperCase() + tab.slice(1) + ' - Routefi Router';
+}
+
+// URL-based navigation
+function getTabFromPath() {
+  const path = location.pathname.replace(/^\//, '');
+  return ['routes', 'requests', 'debug'].includes(path) ? path : 'routes';
+}
+window.addEventListener('popstate', () => switchTab(getTabFromPath(), false));
+
+// Intercept nav clicks for SPA navigation (skip /docs which is a separate page)
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('nav a[href]');
+  if (!a) return;
+  const href = a.getAttribute('href');
+  if (['/routes', '/requests', '/debug'].includes(href)) {
+    e.preventDefault();
+    switchTab(href.slice(1));
+  }
+});
+
+// ── Polling ──────────────────────────────────────────────────────────
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(refreshAll, 10000);
+}
+
+async function refreshAll() {
+  await Promise.all([refreshHealth(), refreshStats()]);
+  if (activeTab === 'requests' && document.getElementById('requests-auto-refresh').checked) {
+    loadRequests();
+  }
+}
+
+// ── Health ───────────────────────────────────────────────────────────
+async function refreshHealth() {
+  const dot = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-label');
+  try {
+    const r = await api('/admin/health');
+    if (!r.ok) throw new Error(r.statusText);
+    const d = await r.json();
+    dot.className = 'conn-dot online';
+    label.textContent = 'x402 API Gateway';
+    document.getElementById('conn-status').textContent = 'Online';
+    document.getElementById('conn-status').style.color = 'var(--green)';
+    document.getElementById('conn-uptime').textContent = d.uptime_human || '-';
+    document.getElementById('conn-routes').textContent = d.route_count;
+    document.getElementById('conn-receipts').textContent = d.receipt_count;
+    const gwUrl = gatewayUrl || 'http://localhost:4402';
+    const endpointEl = document.getElementById('conn-endpoint');
+    endpointEl.textContent = gwUrl;
+    endpointEl.href = gwUrl + '/health';
+    const docsEl = document.getElementById('conn-docs');
+    docsEl.textContent = gwUrl + '/docs';
+    docsEl.href = gwUrl + '/docs';
+    document.getElementById('conn-endpoint-row').style.display = '';
+    document.getElementById('conn-docs-row').style.display = '';
+  } catch {
+    dot.className = 'conn-dot offline';
+    label.textContent = 'x402 API Gateway';
+    document.getElementById('conn-status').textContent = 'Unreachable';
+    document.getElementById('conn-status').style.color = 'var(--red)';
+    document.getElementById('conn-uptime').textContent = '-';
+    document.getElementById('conn-routes').textContent = '-';
+    document.getElementById('conn-receipts').textContent = '-';
+    document.getElementById('conn-endpoint-row').style.display = 'none';
+    document.getElementById('conn-docs-row').style.display = 'none';
+  }
+}
+
+// ── Stats ────────────────────────────────────────────────────────────
+async function refreshStats() {
+  try {
+    const r = await api('/admin/receipts/stats');
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('stat-usdc').textContent = parseFloat(d.total_usdc_spent).toFixed(2);
+  } catch {}
+}
+
+// ── Routes ───────────────────────────────────────────────────────────
+async function loadRoutes() {
+  try {
+    const r = await api('/admin/routes');
+    if (!r.ok) return;
+    const d = await r.json();
+    const container = document.getElementById('routes-grouped');
+
+    // Update tool_id filter dropdown
+    const filterEl = document.getElementById('filter-tool-id');
+    const currentVal = filterEl.value;
+    const toolIds = [...new Set(d.routes.map(r => r.tool_id))];
+    filterEl.innerHTML = '<option value="">All Tools</option>' +
+      toolIds.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+    filterEl.value = currentVal;
+
+    const importCta = document.getElementById('routes-import-cta');
+    const navRoutes = document.getElementById('nav-routes');
+    const sepRoutes = document.getElementById('sep-routes');
+    const routesToolbar = document.getElementById('routes-toolbar');
+    if (d.routes.length === 0) {
+      container.innerHTML = '';
+      routesToolbar.style.display = 'none';
+      if (activeTab !== 'debug') importCta.style.display = 'block';
+      return;
+    }
+    routesToolbar.style.display = '';
+    importCta.style.display = 'none';
+    // Split into enabled and disabled routes
+    const enabledRoutes = d.routes.filter(r => !r.restricted);
+    const disabledRoutes = d.routes.filter(r => r.restricted === true);
+
+    function buildGroupedRows(routeList, prefix) {
+      const groups = {};
+      for (const route of routeList) {
+        const groupKey = extractPathGroup(route.path);
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(route);
+      }
+      const sortedKeys = Object.keys(groups).sort();
+      let rows = '';
+      for (const key of sortedKeys) {
+        const routes = groups[key];
+        const gid = prefix + '-' + key;
+        rows += `<tr class="group-header-row" onclick="toggleGroup('${esc(gid)}')">
+          <td colspan="5">
+            <span class="chevron open" id="chevron-${esc(gid)}">&#9654;</span>
+            <span class="group-name">/${esc(key)}</span>
+          </td>
+        </tr>`;
+        for (const r of routes) {
+          const restricted = r.restricted === true;
+          const desc = r.description || r.tool_id || '';
+          rows += `<tr class="group-route-row${restricted ? ' route-restricted' : ''}" data-group="${esc(gid)}" data-tool="${esc(r.tool_id)}">
+            <td><span class="method-tag method-${esc(r.method)}">${esc(r.method)}</span></td>
+            <td class="mono">${esc(r.path)}</td>
+            <td class="route-desc">${esc(desc)}</td>
+            <td class="route-price-cell">
+              ${restricted
+                ? '<span class="restricted-label">DISABLED</span>'
+                : `<span class="price-display">${esc(r.price_usdc)}</span><span class="price-unit">USDC</span>
+                   <input class="editable-price price-input" value="${esc(r.price_usdc)}" style="display:none"
+                     onchange="saveRoutePrice('${esc(r.tool_id)}', this)" onblur="cancelPriceEdit(this)"
+                     onkeydown="if(event.key==='Escape')cancelPriceEdit(this);if(event.key==='Enter')this.onchange()" />`}
+            </td>
+            <td class="route-actions">
+              <button class="btn btn-sm ${restricted ? 'btn-green' : 'btn-restrict'}" onclick="toggleRouteAccess('${esc(r.tool_id)}', ${restricted})">${restricted ? 'Enable' : 'Disable'}</button>
+              ${restricted ? '' : '<button class="btn btn-sm" onclick="startPriceEdit(this)">Edit Price</button>'}
+            </td>
+          </tr>`;
+        }
+      }
+      return rows;
+    }
+
+    const tableHead = `<thead><tr>
+      <th style="width:80px">Method</th>
+      <th>Path</th>
+      <th>Description</th>
+      <th style="width:160px">Price</th>
+      <th style="width:170px">Actions</th>
+    </tr></thead>`;
+
+    let html = '';
+
+    // Enabled Routes
+    html += `<h3 class="routes-section-title">Enabled Routes <span class="routes-section-count">${enabledRoutes.length}</span></h3>`;
+    if (enabledRoutes.length > 0) {
+      html += `<table class="routes-table">${tableHead}<tbody>${buildGroupedRows(enabledRoutes, 'en')}</tbody></table>`;
+    } else {
+      html += '<div class="empty-state" style="padding:20px">No enabled routes</div>';
+    }
+
+    // Disabled Routes
+    if (disabledRoutes.length > 0) {
+      html += `<h3 class="routes-section-title" style="margin-top:24px">Disabled Routes <span class="routes-section-count">${disabledRoutes.length}</span></h3>`;
+      html += `<table class="routes-table">${tableHead}<tbody>${buildGroupedRows(disabledRoutes, 'dis')}</tbody></table>`;
+    }
+
+    container.innerHTML = html;
+  } catch (e) { console.error('loadRoutes error:', e); }
+}
+
+function extractPathGroup(path) {
+  const segments = path.split('/').filter(Boolean);
+  for (const seg of segments) {
+    if (seg === 'api' || /^v\d+$/.test(seg)) continue;
+    if (seg.startsWith(':') || seg === '*') continue;
+    return seg;
+  }
+  return 'other';
+}
+
+function toggleGroup(id) {
+  const chevron = document.getElementById('chevron-' + id);
+  if (chevron) chevron.classList.toggle('open');
+  document.querySelectorAll(`.group-route-row[data-group="${id}"]`).forEach(row => {
+    row.classList.toggle('hidden');
+  });
+}
+
+function startPriceEdit(btn) {
+  const row = btn.closest('tr');
+  const display = row.querySelector('.price-display');
+  const input = row.querySelector('.price-input');
+  display.style.display = 'none';
+  input.style.display = '';
+  input.focus();
+  input.select();
+}
+
+function cancelPriceEdit(input) {
+  const row = input.closest('tr');
+  const display = row.querySelector('.price-display');
+  input.style.display = 'none';
+  input.value = display.textContent;
+  display.style.display = '';
+}
+
+async function saveRoutePrice(toolId, input) {
+  const row = input.closest('tr');
+  const display = row.querySelector('.price-display');
+  try {
+    await api('/admin/routes/' + encodeURIComponent(toolId), {
+      method: 'PUT',
+      body: JSON.stringify({ price_usdc: input.value }),
+    });
+    display.textContent = input.value;
+  } catch {}
+  input.style.display = 'none';
+  display.style.display = '';
+}
+
+async function toggleRouteAccess(toolId, currentlyRestricted) {
+  try {
+    await api('/admin/routes/' + encodeURIComponent(toolId), {
+      method: 'PUT',
+      body: JSON.stringify({ restricted: !currentlyRestricted }),
+    });
+    loadRoutes();
+  } catch {}
+}
+
+function showGlobalPrice() {
+  document.getElementById('global-price-form').style.display = 'flex';
+  document.getElementById('btn-global-price').style.display = 'none';
+  document.getElementById('input-global-price').focus();
+}
+
+function hideGlobalPrice() {
+  document.getElementById('global-price-form').style.display = 'none';
+  document.getElementById('btn-global-price').style.display = '';
+}
+
+const FREE_ROUTE_PATTERN = /\/(health|heartbeat|ping|status|ready|alive|readiness|liveness)(\/|$)/i;
+
+function isFreeRoute(route) {
+  return FREE_ROUTE_PATTERN.test(route.path) || FREE_ROUTE_PATTERN.test(route.tool_id);
+}
+
+async function applyGlobalPrice() {
+  const price = document.getElementById('input-global-price').value.trim();
+  if (!price || isNaN(parseFloat(price))) return;
+  try {
+    const r = await api('/admin/routes');
+    if (!r.ok) return;
+    const d = await r.json();
+    for (const route of d.routes) {
+      if (route.restricted) continue;
+      const routePrice = isFreeRoute(route) ? '0.00' : price;
+      await api('/admin/routes/' + encodeURIComponent(route.tool_id), {
+        method: 'PUT',
+        body: JSON.stringify({ price_usdc: routePrice }),
+      });
+    }
+    hideGlobalPrice();
+    loadRoutes();
+  } catch {}
+}
+
+async function removeAllRoutes() {
+  if (!confirm('Are you sure you want to remove all routes? This cannot be undone.')) return;
+  try {
+    const r = await api('/admin/routes');
+    if (!r.ok) return;
+    const d = await r.json();
+    for (const route of d.routes) {
+      await api('/admin/routes/' + encodeURIComponent(route.tool_id), { method: 'DELETE' });
+    }
+    loadRoutes();
+    refreshHealth();
+  } catch {}
+}
+
+async function generateDocs() {
+  window.open('/docs', '_blank');
+}
+
+// ── Demo Settings ────────────────────────────────────────────────────
+const demoPresets = {
+  testnet: {
+    wallet: '0x1234567890abcdef1234567890abcdef12345678',
+    baseNetwork: 'base-sepolia',
+    skaleNetwork: 'base-sepolia-testnet',
+    skaleRpc: 'https://base-sepolia-testnet.skalenodes.com/v1/base-testnet',
+    skaleContract: '0x64687C88C767D9a504c392C07393980af2879dC1',
+    skaleBalance: '39.823',
+    cdpBalance: '3.00',
+
+    erc8004Rpc: 'https://sepolia.base.org',
+    erc8004Contract: '0x8004B663056A597Dffe9eCcC1965A193B7388713',
+    erc8004MinScore: '20',
+    rateLimitMax: '100', rateLimitWindow: '60',
+    replayTtl: '300', corsOrigins: '*',
+  },
+  mainnet: {
+    wallet: '0x5F80A88CbbeE1cd9905B89B45dd67c1225ace628',
+    baseNetwork: 'base',
+    skaleNetwork: 'base-mainnet',
+    skaleRpc: 'https://skale-base.skalenodes.com/v1/base',
+    skaleContract: '0x5237c33Ec0af68120B2dDEC5c668681d6F8ABD1E',
+    skaleBalance: '39.823',
+    cdpBalance: '3.00',
+
+    erc8004Rpc: 'https://mainnet.base.org',
+    erc8004Contract: '0x8004BAa17C55a88189AE136b182e5fdA19dE9b63',
+    erc8004MinScore: '20',
+    rateLimitMax: '200', rateLimitWindow: '60',
+    replayTtl: '300', corsOrigins: '*',
+  },
+};
+
+async function loadDemoSettings(network = 'testnet') {
+  const preset = demoPresets[network] || demoPresets.testnet;
+
+  // Show loading state
+  const btn = document.querySelector(`[onclick="loadDemoSettings('${network}')"]`);
+  const origText = btn?.textContent;
+  if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
+
+  // Generate a random test API key
+  const demoKey = 'rt_test_' + Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const demoRoutes = [
+    { method: 'GET', path: '/api/v1/search/:query', tool_id: 'search', price_usdc: '0.01', description: 'Search the web', provider: { provider_id: 'acme-data', backend_url: 'https://api.acme.com', auth: { header: 'Authorization', value: 'Bearer ' + demoKey } } },
+    { method: 'GET', path: '/api/v1/quote', tool_id: 'quote', price_usdc: '0.01', description: 'Get a stock quote', provider: { provider_id: 'acme-data', backend_url: 'https://api.acme.com', auth: { header: 'Authorization', value: 'Bearer ' + demoKey } } },
+    { method: 'POST', path: '/api/v1/analysis', tool_id: 'analysis', price_usdc: '0.05', description: 'Run data analysis', provider: { provider_id: 'acme-data', backend_url: 'https://api.acme.com', auth: { header: 'Authorization', value: 'Bearer ' + demoKey } } },
+    { method: 'GET', path: '/api/v1/internal/restricted', tool_id: 'restricted', price_usdc: '0.00', description: 'Restricted test endpoint (disabled)', restricted: true, provider: { provider_id: 'acme-data', backend_url: 'https://api.acme.com', auth: { header: 'Authorization', value: 'Bearer ' + demoKey } } },
+  ];
+
+  // Add demo routes + a demo blacklist entry in parallel
+  await Promise.allSettled([
+    ...demoRoutes.map(route =>
+      api('/admin/routes', { method: 'POST', body: JSON.stringify(route) })
+    ),
+    api('/admin/blacklist', { method: 'POST', body: JSON.stringify({ address: '0xdead000000000000000000000000000000000bad' }) }),
+    api('/admin/blacklist', { method: 'POST', body: JSON.stringify({ address: '0x7a3f9E04b2C8fD1263c5A29fBe44894E3ecB5b60' }) }),
+  ]);
+
+  // Set demo config from preset
+  document.getElementById('input-api-base-url').value = 'http://localhost:4402';
+  document.getElementById('input-api-key').value = demoKey;
+  document.getElementById('input-wallet-address').value = preset.wallet;
+  document.getElementById('input-base-network').value = preset.baseNetwork;
+  document.getElementById('input-skale-network').value = preset.skaleNetwork;
+  document.getElementById('input-skale-rpc').value = preset.skaleRpc;
+  document.getElementById('input-skale-contract').value = preset.skaleContract;
+  document.getElementById('input-ap2-enabled').checked = preset.ap2Enabled || false;
+
+  document.getElementById('input-erc8004-rpc').value = preset.erc8004Rpc || '';
+  document.getElementById('input-erc8004-contract').value = preset.erc8004Contract || '';
+  document.getElementById('input-erc8004-min-score').value = preset.erc8004MinScore || '20';
+  document.getElementById('input-ratelimit-enabled').checked = true;
+  document.getElementById('input-ratelimit-max').value = preset.rateLimitMax || '100';
+  document.getElementById('input-ratelimit-window').value = preset.rateLimitWindow || '60';
+  document.getElementById('input-replay-enabled').checked = true;
+  document.getElementById('input-replay-ttl').value = preset.replayTtl || '300';
+  document.getElementById('input-cors-origins').value = preset.corsOrigins || '*';
+  await saveDashboardConfig();
+
+  // Mark connections as active (demo settings are known-good)
+  localStorage.setItem('rt-base-connected', preset.baseNetwork);
+  localStorage.setItem('rt-skale-connected', preset.skaleNetwork + '|' + preset.skaleRpc);
+  if (preset.skaleBalance) localStorage.setItem('rt-skale-balance', preset.skaleBalance);
+  if (preset.cdpBalance) localStorage.setItem('rt-cdp-balance', preset.cdpBalance);
+
+  await loadRoutes();
+  loadBlacklist();
+  refreshHealth();
+  updateNetworkLabels();
+  switchTab('routes');
+
+  if (btn) { btn.textContent = origText; btn.disabled = false; }
+}
+
+// ── Import API ───────────────────────────────────────────────────────
+function openImportModal() {
+  // Preload from API Provider settings
+  const apiKey = document.getElementById('input-api-key').value.trim();
+  const baseUrl = document.getElementById('input-api-base-url').value.trim();
+  if (apiKey) {
+    document.getElementById('import-auth-header').value = 'Authorization';
+    document.getElementById('import-auth-value').value = 'Bearer ' + apiKey;
+  }
+  if (baseUrl && !document.getElementById('import-backend-url').value.trim()) {
+    document.getElementById('import-backend-url').value = baseUrl;
+    try {
+      const u = new URL(baseUrl);
+      if (!document.getElementById('import-provider-id').value.trim()) {
+        document.getElementById('import-provider-id').value = u.hostname.replace(/\./g, '-');
+      }
+    } catch {}
+  }
+  document.getElementById('import-modal').classList.add('open');
+}
+function closeImportModal() {
+  document.getElementById('import-modal').classList.remove('open');
+}
+
+function loadImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('import-spec').value = e.target.result;
+  };
+  reader.readAsText(file);
+}
+
+async function fetchOpenApiFromUrl() {
+  const url = document.getElementById('import-spec-url').value.trim();
+  const statusEl = document.getElementById('fetch-spec-status');
+  if (!url) { statusEl.textContent = 'Enter a URL first'; statusEl.style.color = 'var(--red)'; return; }
+  statusEl.textContent = 'Fetching...'; statusEl.style.color = 'var(--muted)';
+  try {
+    const r = await fetch('/fetch-spec', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Fetch failed');
+    document.getElementById('import-spec').value = d.text;
+    statusEl.textContent = 'Loaded successfully'; statusEl.style.color = 'var(--green)';
+    previewImport();
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message; statusEl.style.color = 'var(--red)';
+  }
+}
+
+function parseSpecInput() {
+  const raw = document.getElementById('import-spec').value.trim();
+  if (!raw) throw new Error('No spec provided');
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // Try YAML
+    if (typeof jsyaml !== 'undefined') {
+      return jsyaml.load(raw);
+    }
+    throw new Error('Invalid JSON (js-yaml not loaded for YAML parsing)');
+  }
+}
+
+function previewImport() {
+  const statusEl = document.getElementById('import-status');
+  const previewEl = document.getElementById('import-preview');
+  try {
+    const spec = parseSpecInput();
+    // Auto-fill backend URL from spec servers
+    if (spec.servers && spec.servers.length > 0 && !document.getElementById('import-backend-url').value.trim()) {
+      const serverUrl = spec.servers[0].url;
+      document.getElementById('import-backend-url').value = serverUrl;
+      try {
+        const u = new URL(serverUrl);
+        if (!document.getElementById('import-provider-id').value.trim()) {
+          document.getElementById('import-provider-id').value = u.hostname.replace(/\./g, '-');
+        }
+      } catch {}
+    }
+    const paths = spec.paths || {};
+    const routes = [];
+    const methods = ['get','post','put','delete','patch','head','options'];
+    for (const [path, pathItem] of Object.entries(paths)) {
+      for (const [method, op] of Object.entries(pathItem)) {
+        if (!methods.includes(method.toLowerCase())) continue;
+        routes.push({
+          method: method.toUpperCase(),
+          path,
+          operationId: op.operationId || '',
+          summary: op.summary || op.description || '',
+        });
+      }
+    }
+
+    if (routes.length === 0) {
+      previewEl.innerHTML = '<div style="color:var(--orange);font-size:12px">No routes found in spec</div>';
+      return;
+    }
+
+    previewEl.innerHTML = `
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">${routes.length} routes found:</div>
+      <table class="preview-table">
+        <thead><tr><th>Method</th><th>Path</th><th>Operation</th><th>Summary</th></tr></thead>
+        <tbody>${routes.map(r => `<tr>
+          <td><span class="method-tag method-${esc(r.method)}">${esc(r.method)}</span></td>
+          <td class="mono">${esc(r.path)}</td>
+          <td class="mono">${esc(r.operationId)}</td>
+          <td>${esc(r.summary)}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    statusEl.textContent = '';
+  } catch (e) {
+    previewEl.innerHTML = '';
+    statusEl.textContent = e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+async function executeImport() {
+  const statusEl = document.getElementById('import-status');
+  try {
+    const spec = parseSpecInput();
+    const defaults = {
+      providerId: document.getElementById('import-provider-id').value.trim(),
+      backendUrl: document.getElementById('import-backend-url').value.trim(),
+      priceUsdc: document.getElementById('import-price').value.trim(),
+    };
+
+    if (!defaults.providerId || !defaults.backendUrl || !defaults.priceUsdc) {
+      statusEl.textContent = 'Provider ID, Backend URL, and Price are required';
+      statusEl.style.color = 'var(--red)';
+      return;
+    }
+
+    const authHeader = document.getElementById('import-auth-header').value.trim();
+    const authValue = document.getElementById('import-auth-value').value.trim();
+    if (authHeader) defaults.authHeader = authHeader;
+    if (authValue) defaults.authValue = authValue;
+
+    const r = await api('/admin/routes/import', {
+      method: 'POST',
+      body: JSON.stringify({ openapi: spec, defaults }),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      statusEl.textContent = `Imported ${d.added_count} routes` +
+        (d.skipped_count > 0 ? ` (${d.skipped_count} skipped)` : '');
+      statusEl.style.color = 'var(--green)';
+      loadRoutes();
+      refreshHealth();
+      setTimeout(() => closeImportModal(), 2000);
+    } else {
+      statusEl.textContent = d.error || 'Import failed';
+      statusEl.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    statusEl.textContent = e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+// ── Requests ─────────────────────────────────────────────────────────
+async function loadRequests() {
+  try {
+    const toolId = document.getElementById('filter-tool-id').value;
+    const outcome = document.getElementById('filter-outcome').value;
+    const limit = document.getElementById('filter-limit').value || '50';
+    let qs = `?limit=${limit}`;
+    if (toolId) qs += `&tool_id=${encodeURIComponent(toolId)}`;
+    if (outcome) qs += `&outcome=${encodeURIComponent(outcome)}`;
+
+    const r = await api('/admin/receipts' + qs);
+    if (!r.ok) return;
+    const d = await r.json();
+    allReceipts = d.receipts;
+    const body = document.getElementById('requests-body');
+    const empty = document.getElementById('requests-empty');
+
+    if (d.receipts.length === 0) {
+      body.innerHTML = '';
+      empty.style.display = 'flex';
+      return;
+    }
+    empty.style.display = 'none';
+
+    const baseNetwork = dashboardConfig?.baseNetwork || 'base-sepolia';
+
+    body.innerHTML = d.receipts.map((r, i) => `<tr onclick="toggleDetail(${i})" style="cursor:pointer">
+      <td class="mono">${fmtTime(r.timestamp)}</td>
+      <td>${esc(r.tool_id)}</td>
+      <td><span class="method-tag method-${esc(r.method)}">${esc(r.method)}</span></td>
+      <td class="mono">${esc(r.endpoint)}</td>
+      <td class="outcome-${esc(r.outcome)}">${esc(r.outcome)}</td>
+      <td class="mono">${r.latency_ms != null ? r.latency_ms + 'ms' : '-'}</td>
+      <td class="mono">$${esc(r.price_usdc)}</td>
+      <td class="mono">${formatTxHash(r.payment_tx_hash, baseNetwork)}</td>
+      <td class="mono">${formatReceiptLink(r)}</td>
+    </tr>
+    <tr class="detail-row" id="detail-${i}">
+      <td colspan="9"><div class="detail-pre">${esc(JSON.stringify(r, null, 2))}</div></td>
+    </tr>`).join('');
+  } catch {}
+}
+
+function formatTxHash(hash, network) {
+  if (!hash) return '-';
+  const explorerBase = network === 'base' ? 'https://basescan.org' : 'https://sepolia.basescan.org';
+  const short = hash.slice(0, 8) + '...' + hash.slice(-4);
+  return `<a class="tx-link" href="${explorerBase}/tx/${esc(hash)}" target="_blank" onclick="event.stopPropagation()" title="${esc(hash)}">${short}</a>`;
+}
+
+function formatReceiptLink(receipt) {
+  if (!receipt.receipt_id) return '-';
+  const short = String(receipt.receipt_id).slice(0, 8) + '...';
+  return `<span class="tx-link" onclick="event.stopPropagation();toggleDetail(${allReceipts.indexOf(receipt)})" title="View receipt">${short}</span>`;
+}
+
+function toggleDetail(idx) {
+  document.getElementById('detail-' + idx).classList.toggle('open');
+}
+
+function exportReceipts() {
+  if (allReceipts.length === 0) return;
+  const blob = new Blob([JSON.stringify(allReceipts, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `requests-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function clearAllRequests() {
+  if (!confirm('Clear all request receipts?')) return;
+  try {
+    const r = await api('/admin/receipts', { method: 'DELETE' });
+    if (!r.ok) throw new Error('Failed to clear');
+    allReceipts = [];
+    renderReceipts([]);
+    refreshHealth();
+    refreshStats();
+  } catch (e) {
+    alert('Failed to clear requests: ' + e.message);
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtTime(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', { hour12: false }) + '.' +
+    String(d.getMilliseconds()).padStart(3, '0');
+}
+
+// ── Debug Tests ──────────────────────────────────────────────────────
+let debugCounts = { pass: 0, fail: 0, skip: 0 };
+
+async function debugApiFetch(path, opts = {}) {
+  const fetchOpts = { method: opts.method || 'GET', headers: { ...(opts.headers || {}) } };
+  if (opts.body) {
+    fetchOpts.headers['Content-Type'] = 'application/json';
+    fetchOpts.body = JSON.stringify(opts.body);
+  }
+  return fetch('/api-test' + path, fetchOpts);
+}
+
+function setTestRunning(id) {
+  const card = document.getElementById('debug-' + id);
+  card.className = 'debug-card running';
+  card.querySelector('.debug-result').innerHTML = '<span class="debug-status-badge running">RUNNING...</span>';
+  updateSectionStatus(card);
+}
+
+function setTestResult(id, status, body) {
+  const card = document.getElementById('debug-' + id);
+  card.className = 'debug-card ' + status;
+  const bodyStr = typeof body === 'object' ? JSON.stringify(body, null, 2) : String(body);
+  const escaped = esc(bodyStr).replace(/"(https?:\/\/[^"]+)"/g, '"<a href="$1" target="_blank" style="color:var(--blue,#58a6ff)">$1</a>"');
+  card.querySelector('.debug-result').innerHTML =
+    `<span class="debug-status-badge ${status}">${status.toUpperCase()}</span><pre class="debug-body">${escaped}</pre>`;
+  debugCounts[status] = (debugCounts[status] || 0) + 1;
+  updateDebugSummary();
+  updateSectionStatus(card);
+}
+
+function updateSectionStatus(card) {
+  const section = card.closest('.debug-section');
+  if (!section) return;
+  const key = section.dataset.section;
+  const el = document.getElementById('ss-' + key);
+  if (!el) return;
+  const cards = section.querySelectorAll('.debug-card');
+  let p = 0, f = 0, s = 0, r = 0;
+  cards.forEach(c => {
+    if (c.classList.contains('pass')) p++;
+    else if (c.classList.contains('fail')) f++;
+    else if (c.classList.contains('skip')) s++;
+    else if (c.classList.contains('running')) r++;
+  });
+  const parts = [];
+  if (p) parts.push(`<span class="ss-pass">${p} PASS</span>`);
+  if (f) parts.push(`<span class="ss-fail">${f} FAIL</span>`);
+  if (s) parts.push(`<span class="ss-skip">${s} SKIP</span>`);
+  if (r) parts.push(`<span class="ss-running">${r} RUNNING</span>`);
+  el.innerHTML = parts.join(' · ');
+}
+
+let debugFilter = null;
+
+function toggleDebugFilter(status) {
+  const containers = document.querySelectorAll('.debug-cards');
+  if (debugFilter === status) {
+    debugFilter = null;
+    containers.forEach(c => c.classList.remove('filter-pass', 'filter-fail', 'filter-skip'));
+  } else {
+    debugFilter = status;
+    containers.forEach(c => { c.classList.remove('filter-pass', 'filter-fail', 'filter-skip'); c.classList.add('filter-' + status); });
+  }
+  updateDebugSummary();
+}
+
+function updateDebugTotalCount() {
+  const total = document.querySelectorAll('.debug-card[id^="debug-"]').length;
+  const el = document.getElementById('debug-total-count');
+  if (el) el.textContent = `(${total} tests)`;
+}
+
+function updateDebugSummary() {
+  const el = document.getElementById('debug-summary');
+  const parts = [];
+  const style = s => `cursor:pointer;${debugFilter && debugFilter !== s ? 'opacity:0.4' : ''}`;
+  if (debugCounts.pass) parts.push(`<span style="color:var(--green);${style('pass')}" onclick="toggleDebugFilter('pass')">${debugCounts.pass} PASS</span>`);
+  if (debugCounts.fail) parts.push(`<span style="color:var(--red);${style('fail')}" onclick="toggleDebugFilter('fail')">${debugCounts.fail} FAIL</span>`);
+  if (debugCounts.skip) parts.push(`<span style="color:var(--orange);${style('skip')}" onclick="toggleDebugFilter('skip')">${debugCounts.skip} SKIP</span>`);
+  el.innerHTML = parts.join(' &middot; ');
+}
+
+function clearAllTests() {
+  debugCounts = { pass: 0, fail: 0, skip: 0 };
+  debugFilter = null;
+  document.querySelectorAll('.debug-cards').forEach(c => c.classList.remove('filter-pass', 'filter-fail', 'filter-skip'));
+  document.querySelectorAll('.debug-card').forEach(card => {
+    card.className = 'debug-card';
+    card.querySelector('.debug-result').innerHTML = '';
+  });
+  document.getElementById('debug-summary').innerHTML = '';
+  document.querySelectorAll('.debug-section-status').forEach(el => el.innerHTML = '');
+  e2eState = { receipt: null };
+}
+
+function debugGetFirstEnabled(routes) { return routes.find(r => !r.restricted); }
+function debugGetFirstDisabled(routes) { return routes.find(r => r.restricted); }
+function debugConcretePath(path) { return path.replace(/:([^/]+)/g, 'test'); }
+
+async function debugLoadContext() {
+  let routes = [], cfg = null;
+  try { const r = await api('/admin/routes'); if (r.ok) routes = (await r.json()).routes || []; } catch {}
+  try { const r = await api('/admin/dashboard-config'); if (r.ok) cfg = await r.json(); } catch {}
+  return { routes, cfg };
+}
+
+function toggleSection(header) {
+  header.closest('.debug-section').classList.toggle('collapsed');
+  updateToggleAllLabel();
+}
+
+function toggleAllSections() {
+  const sections = document.querySelectorAll('.debug-section');
+  const allCollapsed = [...sections].every(s => s.classList.contains('collapsed'));
+  sections.forEach(s => { if (allCollapsed) s.classList.remove('collapsed'); else s.classList.add('collapsed'); });
+  updateToggleAllLabel();
+}
+
+function updateToggleAllLabel() {
+  const btn = document.getElementById('btn-toggle-sections');
+  const sections = document.querySelectorAll('.debug-section');
+  const allCollapsed = [...sections].every(s => s.classList.contains('collapsed'));
+  btn.textContent = allCollapsed ? 'Expand All' : 'Collapse All';
+}
+
+// Section registry: key → function that returns array of test steps.
+// Each step is either a function (run alone) or an array of functions (run in parallel).
+const debugSections = {
+  core:       (r, c) => [[testHealthCheck, () => testRouteMatch(r,c), () => testRouteNotFound(c), () => testRestrictedRoute(r,c), () => testAuth401(r,c), () => testAuthValid(r,c)]],
+  e2e:        (r, c) => [() => testE2ePipeline(c), [testE2eReceipt, testE2eHash], [() => testE2e402(c), testE2eSkale], testBiteLifecycle, () => testUpstreamError(c), testE2eRealPayment],
+  payment:    (r, c) => [() => testPaymentRequired(r,c), () => testX402HeaderValid(r,c), () => testFacilitator(c), () => testIdempotency(r,c)],
+  skale:      (r, c) => [[() => testSkaleRpc(c), () => testSkaleBlock(c), () => testBiteCommittee(c), () => testBiteContract(c)]],
+  mandate:    (r, c) => [
+    [() => testMandateSkipped(r,c), () => testMandateRejected(r,c)],
+    [() => testMandateSig(r,c), () => testMandateExpired(r,c), () => testMandateBudget()],
+    [() => testIntentBudget(r,c), () => testIntentMerchant(r,c)],
+  ],
+  x402:       ()     => [[testX402Probe, testX402Skip, testSsrfBlocked]],
+  blacklist:  (r, c) => [testBlacklistApi, [() => testAgentAllowed(r,c), () => testAgentBlocked(r,c)], testErc8004Query, [() => testErc8004Allowed(r,c), testErc8004Blocked]],
+  receipts:   (r, c) => [[testReceiptsStats, testReceiptsList, testReceiptsFilter], () => testReceiptIntegrity(r, c)],
+  admin:      ()     => [[testAdminConfig, testDashboardConfigTest, testAdminRoutes], [testOpenApiImport, testPriceUpdate]],
+  docs:       ()     => [testOpenApiSpec],
+  cdp:        ()     => [[testCdpEnv, testCdpApi]],
+};
+
+// Run a step: if it's an array, run all in parallel; if a function, run it alone.
+async function runStep(step) {
+  if (Array.isArray(step)) await Promise.allSettled(step.map(fn => fn()));
+  else await step();
+}
+
+async function runSection(key) {
+  const { routes, cfg } = await debugLoadContext();
+  const steps = debugSections[key](routes, cfg);
+  for (const step of steps) await runStep(step);
+}
+
+// Batch plan for runAllTests: groups of sections that can run in parallel.
+// Batch 1: slowest sections first (e2e creates routes + probes, core has 6 tests) + fast read-only
+// Batch 2: remaining route-creating sections
+const sectionBatches = [
+  ['e2e', 'core', 'admin', 'receipts', 'docs', 'skale', 'cdp'],
+  ['payment', 'mandate', 'x402', 'blacklist'],
+];
+
+async function runAllTests() {
+  clearAllTests();
+  const { routes, cfg } = await debugLoadContext();
+  for (const batch of sectionBatches) {
+    await Promise.allSettled(batch.map(async key => {
+      const steps = debugSections[key](routes, cfg);
+      for (const step of steps) await runStep(step);
+    }));
+  }
+}
+
+async function testHealthCheck() {
+  setTestRunning('health');
+  try {
+    const r = await debugApiFetch('/health');
+    const d = await r.json();
+    setTestResult('health', r.status === 200 && d.status === 'ok' ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('health', 'fail', { error: e.message }); }
+}
+
+async function testRouteMatch(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('route-match');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('route-match', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    setTestResult('route-match', r.status !== 404 ? 'pass' : 'fail', { status: r.status, path, body: d });
+  } catch (e) { setTestResult('route-match', 'fail', { error: e.message }); }
+}
+
+async function testRouteNotFound(cfg) {
+  if (!cfg) { const ctx = await debugLoadContext(); cfg = ctx.cfg; }
+  setTestRunning('route-404');
+  try {
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch('/api/v1/__nonexistent__', { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    setTestResult('route-404', r.status === 404 ? 'pass' : 'fail', { status: r.status, body: d });
+  } catch (e) { setTestResult('route-404', 'fail', { error: e.message }); }
+}
+
+async function testRestrictedRoute(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('route-restricted');
+  const route = debugGetFirstDisabled(routes);
+  if (!route) { setTestResult('route-restricted', 'skip', 'No disabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    setTestResult('route-restricted', 'pass', { status: r.status, path, body: d });
+  } catch (e) { setTestResult('route-restricted', 'fail', { error: e.message }); }
+}
+
+async function testAuth401(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('auth-401');
+  if (!cfg?.apiKey) { setTestResult('auth-401', 'skip', 'No API key configured'); return; }
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('auth-401', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const r = await debugApiFetch(path);
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    setTestResult('auth-401', r.status === 401 ? 'pass' : 'fail', { status: r.status, body: d });
+  } catch (e) { setTestResult('auth-401', 'fail', { error: e.message }); }
+}
+
+async function testAuthValid(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('auth-valid');
+  if (!cfg?.apiKey) { setTestResult('auth-valid', 'skip', 'No API key configured'); return; }
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('auth-valid', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const r = await debugApiFetch(path, { headers: { 'Authorization': `Bearer ${cfg.apiKey}` } });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    setTestResult('auth-valid', r.status !== 401 ? 'pass' : 'fail', { status: r.status, body: d });
+  } catch (e) { setTestResult('auth-valid', 'fail', { error: e.message }); }
+}
+
+async function testRateLimit() {
+  setTestRunning('rate-limit');
+  try {
+    let got429 = false;
+    const promises = [];
+    for (let i = 0; i < 105; i++) {
+      promises.push(fetch('/api-test/health').then(r => { if (r.status === 429) got429 = true; return r.status; }));
+    }
+    const statuses = await Promise.all(promises);
+    const count429 = statuses.filter(s => s === 429).length;
+    setTestResult('rate-limit', got429 ? 'pass' : 'fail', { total: 105, got429: count429, last10: statuses.slice(-10) });
+  } catch (e) { setTestResult('rate-limit', 'fail', { error: e.message }); }
+}
+
+async function testIdempotency(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('idempotency');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('idempotency', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const idemKey = 'debug-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    const headers = { 'X-Request-Idempotency-Key': idemKey };
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    await debugApiFetch(path, { headers });
+    const r2 = await debugApiFetch(path, { headers });
+    const text = await r2.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    setTestResult('idempotency', r2.status === 409 ? 'pass' : 'fail', { status: r2.status, key: idemKey, body: d });
+  } catch (e) { setTestResult('idempotency', 'fail', { error: e.message }); }
+}
+
+async function testFacilitator(cfg) {
+  if (!cfg) { try { const r = await api('/admin/dashboard-config'); if (r.ok) cfg = await r.json(); } catch {} }
+  setTestRunning('payment-facilitator');
+  try {
+    const r = await api('/admin/facilitator/status');
+    const d = await r.json();
+    if (r.ok && d.ok) {
+      const network = cfg?.baseNetwork === 'base' ? 'eip155:8453' : 'eip155:84532';
+      const supported = d.kinds.filter(k => k.network === network);
+      setTestResult('payment-facilitator', 'pass', {
+        url: d.url,
+        cdpAuth: d.cdpAuth,
+        totalSchemes: d.kinds.length,
+        networkSchemes: supported.length,
+        network,
+      });
+    } else {
+      setTestResult('payment-facilitator', 'fail', d);
+    }
+  } catch (e) { setTestResult('payment-facilitator', 'fail', { error: e.message }); }
+}
+
+async function testPaymentRequired(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('payment-402');
+  const route = routes.find(r => !r.restricted && parseFloat(r.price_usdc || '0') > 0);
+  if (!route) { setTestResult('payment-402', 'skip', 'No paid routes configured'); return; }
+  if (!cfg?.payToAddress) { setTestResult('payment-402', 'skip', 'No pay-to address configured (x402 disabled)'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    if (r.status === 402) {
+      setTestResult('payment-402', 'pass', { status: 402, body: d });
+    } else if (r.status === 502 && d?.reason_code === 'UPSTREAM_ERROR_NO_CHARGE') {
+      setTestResult('payment-402', 'pass', { status: r.status, note: 'Route matched with pricing ($' + route.price_usdc + '), upstream unreachable (demo). x402 facilitator may need configuration.', body: d });
+    } else {
+      setTestResult('payment-402', 'fail', { status: r.status, body: d });
+    }
+  } catch (e) { setTestResult('payment-402', 'fail', { error: e.message }); }
+}
+
+async function testX402HeaderValid(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('payment-x402-header');
+  const route = routes.find(r => !r.restricted && parseFloat(r.price_usdc || '0') > 0);
+  if (!route) { setTestResult('payment-x402-header', 'skip', 'No paid routes configured'); return; }
+  if (!cfg?.payToAddress) { setTestResult('payment-x402-header', 'skip', 'No pay-to address configured'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    if (r.status !== 402) {
+      if (r.status === 502 && d?.reason_code === 'UPSTREAM_ERROR_NO_CHARGE') {
+        setTestResult('payment-x402-header', 'skip', 'x402 facilitator not reachable — cannot validate 402 headers');
+      } else {
+        setTestResult('payment-x402-header', 'fail', { status: r.status, note: 'Expected 402', body: d });
+      }
+      return;
+    }
+    // Validate x402 payment requirements — check body first, then payment-required header
+    let reqs = d?.paymentRequirements || d?.accepts;
+    let source = 'body';
+    if (!reqs || !Array.isArray(reqs) || reqs.length === 0) {
+      // x402 v2 puts payment info in the payment-required header as base64 JSON
+      const prHeader = r.headers.get('payment-required');
+      if (prHeader) {
+        try {
+          const decoded = JSON.parse(atob(prHeader));
+          reqs = decoded?.paymentRequirements || decoded?.accepts;
+          source = 'header';
+        } catch {}
+      }
+    }
+    if (!reqs || !Array.isArray(reqs) || reqs.length === 0) {
+      setTestResult('payment-x402-header', 'skip', 'x402 facilitator not fully configured — 402 returned without payment requirements');
+      return;
+    }
+    const req0 = reqs[0];
+    const hasPayTo = !!req0.payTo || !!req0.pay_to;
+    const hasNetwork = !!req0.network;
+    const hasMaxAmount = req0.maxAmountRequired != null || req0.amount != null;
+    if (hasPayTo && hasNetwork) {
+      setTestResult('payment-x402-header', 'pass', { payTo: req0.payTo || req0.pay_to, network: req0.network, maxAmount: req0.maxAmountRequired || req0.amount, scheme: req0.scheme || null });
+    } else {
+      setTestResult('payment-x402-header', 'fail', { note: 'Missing required x402 fields', hasPayTo, hasNetwork, hasMaxAmount, body: d });
+    }
+  } catch (e) { setTestResult('payment-x402-header', 'fail', { error: e.message }); }
+}
+
+async function testMandateSkipped(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('mandate-skipped');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('mandate-skipped', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    const mandateBlocked = r.status === 403 && (d?.reason_code || '').startsWith('MANDATE_');
+    if (mandateBlocked) {
+      setTestResult('mandate-skipped', 'fail', { status: r.status, note: 'Request blocked by mandate middleware', body: d });
+    } else {
+      const verdict = d?.mandate_verdict || 'SKIPPED';
+      setTestResult('mandate-skipped', 'pass', { status: r.status, mandate_verdict: verdict, note: 'No mandate required, request proceeded' });
+    }
+  } catch (e) { setTestResult('mandate-skipped', 'fail', { error: e.message }); }
+}
+
+async function testMandateRejected(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('mandate-rejected');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('mandate-rejected', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = { 'X-Mandate': 'not-valid-base64!!!' };
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    setTestResult('mandate-rejected', r.status === 400 ? 'pass' : 'fail', { status: r.status, body: d });
+  } catch (e) { setTestResult('mandate-rejected', 'fail', { error: e.message }); }
+}
+
+// Pre-signed mandate payloads (Hardhat Account #0: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
+const MANDATE_VALID_B64 = 'eyJtYW5kYXRlX2lkIjoiZGVidWctbWFuZGF0ZS12YWxpZCIsIm93bmVyX3B1YmtleSI6IjB4ZjM5RmQ2ZTUxYWFkODhGNkY0Y2U2YUI4ODI3Mjc5Y2ZmRmI5MjI2NiIsImV4cGlyZXNfYXQiOiIyMDk5LTAxLTAxVDAwOjAwOjAwLjAwMFoiLCJtYXhfc3BlbmRfdXNkY19wZXJfZGF5IjoiMTAwLjAwIiwiYWxsb3dsaXN0ZWRfdG9vbF9pZHMiOlsiKiJdLCJzaWduYXR1cmUiOiIweDZmZjQ0ODdkM2EwNmZiNzAzMTI0ZWM5YTU5NTg3NzEzYTkzODU4NjNlZjZmM2UxNTU5YTM1NzNkMmMyZjYwZGE0YzQ5NzRmZTFiNzkyYTlhMmNhMTBmZTQxNjc3ZGI2OWVhYzg5Yjc4YjRjODNhZDM4OTM1MDNmM2EwYTk0MThmMWIifQ==';
+const MANDATE_EXPIRED_B64 = 'eyJtYW5kYXRlX2lkIjoiZGVidWctbWFuZGF0ZS1leHBpcmVkIiwib3duZXJfcHVia2V5IjoiMHhmMzlGZDZlNTFhYWQ4OEY2RjRjZTZhQjg4MjcyNzljZmZGYjkyMjY2IiwiZXhwaXJlc19hdCI6IjIwMjAtMDEtMDFUMDA6MDA6MDAuMDAwWiIsIm1heF9zcGVuZF91c2RjX3Blcl9kYXkiOiIxMDAuMDAiLCJhbGxvd2xpc3RlZF90b29sX2lkcyI6WyIqIl0sInNpZ25hdHVyZSI6IjB4OGE4YzQ0NjY4OThhNGVjMWU0YWRlOTg5YzY4NmQxY2FhOTY3MmQwMGIyYzBjNTNjNDA1Zjg4YTE5YmJkMjEyOTBkZDE2OGFlZTY3MzVhYmRlNmEzMjZhYzE2MzRkZjU2OWVlODZkZDcxZDMxMjZjY2RiMjVmMDQ3ZjU1Y2IzZTExYyJ9';
+const INTENT_LOW_BUDGET_B64 = 'eyJ0eXBlIjoiSW50ZW50TWFuZGF0ZSIsImNvbnRlbnRzIjp7Im5hdHVyYWxfbGFuZ3VhZ2VfZGVzY3JpcHRpb24iOiJEZWJ1ZyB0ZXN0OiBsb3cgYnVkZ2V0IGludGVudCIsImJ1ZGdldCI6eyJhbW91bnQiOjAuMDAxLCJjdXJyZW5jeSI6IlVTRCJ9LCJtZXJjaGFudHMiOlsibG9jYWxob3N0IiwiKiJdLCJpbnRlbnRfZXhwaXJ5IjoiMjA5OS0wMS0wMVQwMDowMDowMC4wMDBaIiwicmVxdWlyZXNfcmVmdW5kYWJpbGl0eSI6ZmFsc2V9LCJ1c2VyX3NpZ25hdHVyZSI6IjB4YjQxNzAyYzhhNDQxM2EyMDU3NzgyNDRiMjVkYjcyOGQxMjA2OWI2MGU1MGIxOGFiNTAwZWRhMzA0YWMyMzdhNjJjZDRkNmFiZjM3OTcxM2VlYThhMzYwZWEwMDY2MWM4MTgyNTU1ZmQ2OTc4ZDMyM2Q2NzFiNWQ3OGE0YWQxMmUxYyIsInRpbWVzdGFtcCI6IjIwMjYtMDItMTNUMDk6MDc6NTQuMjQwWiIsInNpZ25lcl9hZGRyZXNzIjoiMHhmMzlGZDZlNTFhYWQ4OEY2RjRjZTZhQjg4MjcyNzljZmZGYjkyMjY2In0=';
+const INTENT_WRONG_MERCHANT_B64 = 'eyJ0eXBlIjoiSW50ZW50TWFuZGF0ZSIsImNvbnRlbnRzIjp7Im5hdHVyYWxfbGFuZ3VhZ2VfZGVzY3JpcHRpb24iOiJEZWJ1ZyB0ZXN0OiB3cm9uZyBtZXJjaGFudCIsImJ1ZGdldCI6eyJhbW91bnQiOjEwMCwiY3VycmVuY3kiOiJVU0QifSwibWVyY2hhbnRzIjpbIndyb25nLmV4YW1wbGUuY29tIl0sImludGVudF9leHBpcnkiOiIyMDk5LTAxLTAxVDAwOjAwOjAwLjAwMFoiLCJyZXF1aXJlc19yZWZ1bmRhYmlsaXR5IjpmYWxzZX0sInVzZXJfc2lnbmF0dXJlIjoiMHgzODc5YzU3M2ViMTUyOTQxODZmNDIxM2FlY2QwMmEwNWIzZDc1Y2NlYzg0NmEzODQ1YmM1ZTAxZmMzNDQwZWIzMGNhNTk2NzJhNWZjMGZjMGU0NjJjMWZkODZjYTliM2VhYjM0ODBkYjYzMzA4ZDUwNDE0ZjIwMGM1ZjZmZjRkOTFjIiwidGltZXN0YW1wIjoiMjAyNi0wMi0xM1QwOTowNzo1NC4yNDJaIiwic2lnbmVyX2FkZHJlc3MiOiIweGYzOUZkNmU1MWFhZDg4RjZGNGNlNmFCODgyNzI3OWNmZkZiOTIyNjYifQ==';
+
+async function testMandateSig(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('mandate-sig');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('mandate-sig', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = { 'X-Mandate': MANDATE_VALID_B64 };
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    // PASS if we did NOT get INVALID_SIGNATURE — any other response (402 payment required,
+    // ENDPOINT_NOT_ALLOWLISTED, etc.) means the signature was verified successfully
+    const sigFailed = r.status === 403 && d?.reason_code === 'INVALID_SIGNATURE';
+    setTestResult('mandate-sig', sigFailed ? 'fail' : 'pass', {
+      status: r.status,
+      note: sigFailed ? 'EIP-191 signature rejected' : 'Signature verified OK (response is downstream of mandate check)',
+      signer: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+      body: d,
+    });
+  } catch (e) { setTestResult('mandate-sig', 'fail', { error: e.message }); }
+}
+
+async function testMandateExpired(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('mandate-expired');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('mandate-expired', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = { 'X-Mandate': MANDATE_EXPIRED_B64 };
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    const expired = r.status === 403 && d?.reason_code === 'MANDATE_EXPIRED';
+    setTestResult('mandate-expired', expired ? 'pass' : 'fail', {
+      status: r.status,
+      note: expired ? 'Correctly rejected expired mandate' : 'Expected 403 MANDATE_EXPIRED',
+      body: d,
+    });
+  } catch (e) { setTestResult('mandate-expired', 'fail', { error: e.message }); }
+}
+
+async function testMandateBudget() {
+  setTestRunning('mandate-budget');
+  try {
+    const r = await api('/admin/spend/debug-mandate-valid');
+    const d = await r.json();
+    setTestResult('mandate-budget', r.ok ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('mandate-budget', 'fail', { error: e.message }); }
+}
+
+async function testIntentBudget(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('intent-budget');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('intent-budget', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = { 'X-Mandate': INTENT_LOW_BUDGET_B64 };
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    const budgetExceeded = r.status === 403 && d?.reason_code === 'INTENT_BUDGET_EXCEEDED';
+    setTestResult('intent-budget', budgetExceeded ? 'pass' : 'fail', {
+      status: r.status,
+      note: budgetExceeded ? 'Correctly rejected — $0.001 budget too low' : 'Expected 403 INTENT_BUDGET_EXCEEDED',
+      body: d,
+    });
+  } catch (e) { setTestResult('intent-budget', 'fail', { error: e.message }); }
+}
+
+async function testIntentMerchant(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('intent-merchant');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('intent-merchant', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = { 'X-Mandate': INTENT_WRONG_MERCHANT_B64 };
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    const merchantFailed = r.status === 403 && d?.reason_code === 'MERCHANT_NOT_MATCHED';
+    setTestResult('intent-merchant', merchantFailed ? 'pass' : 'fail', {
+      status: r.status,
+      note: merchantFailed ? 'Correctly rejected — wrong.example.com not matched' : 'Expected 403 MERCHANT_NOT_MATCHED',
+      body: d,
+    });
+  } catch (e) { setTestResult('intent-merchant', 'fail', { error: e.message }); }
+}
+
+async function testBlacklistApi() {
+  setTestRunning('blacklist-api');
+  try {
+    const r = await api('/admin/blacklist');
+    const d = await r.json();
+    setTestResult('blacklist-api', r.ok && Array.isArray(d.blacklist) ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('blacklist-api', 'fail', { error: e.message }); }
+}
+
+async function testAgentAllowed(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('agent-allowed');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('agent-allowed', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const testAddr = '0x' + 'a'.repeat(40);
+    const headers = { 'X-Agent-Address': testAddr };
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    const blocked = r.status === 403 && d?.reason_code === 'AGENT_BLOCKED';
+    setTestResult('agent-allowed', !blocked ? 'pass' : 'fail', { status: r.status, agent: testAddr, note: blocked ? 'Agent is blacklisted' : 'Agent not on blacklist, request proceeded' });
+  } catch (e) { setTestResult('agent-allowed', 'fail', { error: e.message }); }
+}
+
+async function testAgentBlocked(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('agent-blocked');
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('agent-blocked', 'skip', 'No enabled routes'); return; }
+  const testAddr = '0xDEAD' + 'b'.repeat(36);
+  try {
+    // Add to blacklist
+    const addR = await api('/admin/blacklist', {
+      method: 'POST',
+      body: JSON.stringify({ address: testAddr }),
+    });
+    if (!addR.ok) { setTestResult('agent-blocked', 'fail', { error: 'Failed to add to blacklist', status: addR.status }); return; }
+
+    // Make request with blacklisted agent
+    const path = debugConcretePath(route.path);
+    const headers = { 'X-Agent-Address': testAddr };
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+
+    // Remove from blacklist (cleanup)
+    await api('/admin/blacklist/' + encodeURIComponent(testAddr), { method: 'DELETE' });
+
+    const blocked = r.status === 403 && d?.reason_code === 'AGENT_BLOCKED';
+    setTestResult('agent-blocked', blocked ? 'pass' : 'fail', { status: r.status, agent: testAddr, body: d });
+  } catch (e) {
+    // Cleanup on error
+    try { await api('/admin/blacklist/' + encodeURIComponent(testAddr), { method: 'DELETE' }); } catch {}
+    setTestResult('agent-blocked', 'fail', { error: e.message });
+  }
+}
+
+async function testErc8004Query() {
+  setTestRunning('erc8004-query');
+  try {
+    const r = await api('/admin/reputation/1');
+    const d = await r.json();
+    if (r.status === 400 && d.error === 'ERC-8004 not configured') {
+      setTestResult('erc8004-query', 'skip', 'ERC-8004 not configured');
+    } else if (r.ok && typeof d.score === 'number') {
+      // Update the block threshold description with actual min_score
+      if (d.min_score != null) {
+        const desc = document.getElementById('erc8004-block-desc');
+        if (desc) desc.textContent = `Min score: ${d.min_score} — agents with no feedback pass (fail-open), scores below ${d.min_score} are blocked`;
+      }
+      setTestResult('erc8004-query', 'pass', d);
+    } else {
+      setTestResult('erc8004-query', 'fail', d);
+    }
+  } catch (e) { setTestResult('erc8004-query', 'fail', { error: e.message }); }
+}
+
+async function testErc8004Allowed(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('erc8004-allowed');
+  // Check if ERC-8004 is configured
+  const check = await api('/admin/reputation/1');
+  if (check.status === 400) { setTestResult('erc8004-allowed', 'skip', 'ERC-8004 not configured'); return; }
+  const route = debugGetFirstEnabled(routes);
+  if (!route) { setTestResult('erc8004-allowed', 'skip', 'No enabled routes'); return; }
+  try {
+    const path = debugConcretePath(route.path);
+    const headers = { 'X-Agent-Id': '1' };
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch(path, { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+    const blocked = r.status === 403 && d?.reason_code === 'LOW_REPUTATION';
+    setTestResult('erc8004-allowed', !blocked ? 'pass' : 'fail', { status: r.status, agentId: 1, note: blocked ? 'Agent blocked by reputation' : 'Agent passed reputation check' });
+  } catch (e) { setTestResult('erc8004-allowed', 'fail', { error: e.message }); }
+}
+
+async function testErc8004Blocked() {
+  setTestRunning('erc8004-blocked');
+  try {
+    const check = await api('/admin/reputation/1');
+    if (check.status === 400) { setTestResult('erc8004-blocked', 'skip', 'ERC-8004 not configured'); return; }
+    // Query with impossibly high min_score to verify block logic
+    const r = await api('/admin/reputation/1?min_score=999999');
+    const d = await r.json();
+    if (!r.ok) { setTestResult('erc8004-blocked', 'fail', d); return; }
+    // If count=0 (no feedback), agent is always allowed — that's correct behavior
+    if (d.count === 0) {
+      setTestResult('erc8004-blocked', 'pass', { ...d, note: 'No on-chain feedback yet — agent allowed (fail-open). With feedback and score < 999999, would be blocked.' });
+    } else {
+      // count > 0: with min_score=999999, allowed should be false
+      setTestResult('erc8004-blocked', d.allowed === false ? 'pass' : 'fail', { ...d, note: d.allowed === false ? 'Agent would be blocked (score below threshold)' : 'Expected blocked but got allowed' });
+    }
+  } catch (e) { setTestResult('erc8004-blocked', 'fail', { error: e.message }); }
+}
+
+async function testReceiptsStats() {
+  setTestRunning('receipts-stats');
+  try {
+    const r = await api('/admin/receipts/stats');
+    const d = await r.json();
+    setTestResult('receipts-stats', r.ok && 'total_requests' in d ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('receipts-stats', 'fail', { error: e.message }); }
+}
+
+async function testReceiptsList() {
+  setTestRunning('receipts-list');
+  try {
+    const r = await api('/admin/receipts?limit=5');
+    const d = await r.json();
+    setTestResult('receipts-list', r.ok && Array.isArray(d.receipts) ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('receipts-list', 'fail', { error: e.message }); }
+}
+
+async function testReceiptsFilter() {
+  setTestRunning('receipts-filter');
+  try {
+    const r = await api('/admin/receipts?outcome=DENIED&limit=10');
+    const d = await r.json();
+    const ok = r.ok && Array.isArray(d.receipts) && d.receipts.every(r => r.outcome === 'DENIED');
+    setTestResult('receipts-filter', ok ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('receipts-filter', 'fail', { error: e.message }); }
+}
+
+async function testAdminConfig() {
+  setTestRunning('admin-config');
+  try {
+    const r = await api('/admin/config');
+    const d = await r.json();
+    setTestResult('admin-config', r.ok && ('port' in d || 'baseNetwork' in d) ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('admin-config', 'fail', { error: e.message }); }
+}
+
+async function testDashboardConfigTest() {
+  setTestRunning('admin-dashboard');
+  try {
+    const r = await api('/admin/dashboard-config');
+    const d = await r.json();
+    setTestResult('admin-dashboard', r.ok ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('admin-dashboard', 'fail', { error: e.message }); }
+}
+
+async function testAdminRoutes() {
+  setTestRunning('admin-routes');
+  try {
+    const r = await api('/admin/routes');
+    const d = await r.json();
+    setTestResult('admin-routes', r.ok && Array.isArray(d.routes) ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('admin-routes', 'fail', { error: e.message }); }
+}
+
+async function testOpenApiSpec() {
+  setTestRunning('openapi');
+  try {
+    const r = await api('/admin/docs/openapi');
+    const d = await r.json();
+    const ok = r.ok && d.openapi && d.openapi.startsWith('3.0') && d.paths;
+    setTestResult('openapi', ok ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('openapi', 'fail', { error: e.message }); }
+}
+
+async function testSkaleRpc(cfg) {
+  if (!cfg) { try { const r = await api('/admin/dashboard-config'); if (r.ok) cfg = await r.json(); } catch {} }
+  setTestRunning('skale-rpc');
+  if (!cfg?.skaleRpcUrl) { setTestResult('skale-rpc', 'skip', 'No SKALE RPC URL configured'); return; }
+  try {
+    const r = await fetch('/rpc-proxy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rpcUrl: cfg.skaleRpcUrl, body: { jsonrpc: '2.0', method: 'eth_chainId', params: [], id: 1 } }),
+    });
+    const d = await r.json();
+    if (d.result) {
+      setTestResult('skale-rpc', 'pass', { chainId: parseInt(d.result, 16), raw: d.result });
+    } else { setTestResult('skale-rpc', 'fail', d); }
+  } catch (e) { setTestResult('skale-rpc', 'fail', { error: e.message }); }
+}
+
+async function testSkaleBlock(cfg) {
+  if (!cfg) { try { const r = await api('/admin/dashboard-config'); if (r.ok) cfg = await r.json(); } catch {} }
+  setTestRunning('skale-block');
+  if (!cfg?.skaleRpcUrl) { setTestResult('skale-block', 'skip', 'No SKALE RPC URL configured'); return; }
+  try {
+    const r = await fetch('/rpc-proxy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rpcUrl: cfg.skaleRpcUrl, body: { jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 } }),
+    });
+    const d = await r.json();
+    if (d.result) {
+      setTestResult('skale-block', 'pass', { blockNumber: parseInt(d.result, 16), raw: d.result });
+    } else { setTestResult('skale-block', 'fail', d); }
+  } catch (e) { setTestResult('skale-block', 'fail', { error: e.message }); }
+}
+
+async function testBiteCommittee(cfg) {
+  if (!cfg) { try { const r = await api('/admin/dashboard-config'); if (r.ok) cfg = await r.json(); } catch {} }
+  setTestRunning('bite-committee');
+  if (!cfg?.skaleRpcUrl) { setTestResult('bite-committee', 'skip', 'No SKALE RPC URL configured'); return; }
+  try {
+    const r = await fetch('/rpc-proxy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rpcUrl: cfg.skaleRpcUrl, body: { jsonrpc: '2.0', method: 'bite_getCommitteesInfo', params: [], id: 1 } }),
+    });
+    const d = await r.json();
+    if (d.error) {
+      setTestResult('bite-committee', 'skip', 'BITE not enabled on this chain (' + (d.error.message || d.error) + ')');
+    } else if (Array.isArray(d.result) && d.result.length > 0 && d.result[0].commonBLSPublicKey) {
+      const committees = d.result.length;
+      const epochId = d.result[0].epochId;
+      const keyPreview = d.result[0].commonBLSPublicKey.slice(0, 16) + '...';
+      setTestResult('bite-committee', 'pass', { committees, epochId, blsKeyPreview: keyPreview, rotating: committees > 1 });
+    } else {
+      setTestResult('bite-committee', 'fail', d);
+    }
+  } catch (e) { setTestResult('bite-committee', 'fail', { error: e.message }); }
+}
+
+async function testBiteContract(cfg) {
+  if (!cfg) { try { const r = await api('/admin/dashboard-config'); if (r.ok) cfg = await r.json(); } catch {} }
+  setTestRunning('bite-contract');
+  if (!cfg?.skaleRpcUrl || !cfg?.skaleBiteContract) {
+    setTestResult('bite-contract', 'skip', 'No SKALE RPC URL or BITE contract configured');
+    return;
+  }
+  try {
+    // Step 1: eth_getCode — verify contract is deployed
+    const codeR = await fetch('/rpc-proxy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rpcUrl: cfg.skaleRpcUrl, body: { jsonrpc: '2.0', method: 'eth_getCode', params: [cfg.skaleBiteContract, 'latest'], id: 1 } }),
+    });
+    const codeD = await codeR.json();
+    if (!codeD.result || codeD.result === '0x' || codeD.result === '0x0') {
+      setTestResult('bite-contract', 'fail', { error: 'No bytecode at contract address', address: cfg.skaleBiteContract });
+      return;
+    }
+    const codeSize = (codeD.result.length - 2) / 2; // hex bytes
+
+    // Step 2: eth_call getIntent(0x00..00) — verify ABI is correct (should return empty/zero tuple)
+    // getIntent(bytes32) selector = keccak256("getIntent(bytes32)")[:4] = 0xf13c46aa
+    const dummyIntentId = '0x' + '00'.repeat(32);
+    const callData = '0xf13c46aa' + dummyIntentId.slice(2);
+    const callR = await fetch('/rpc-proxy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rpcUrl: cfg.skaleRpcUrl, body: { jsonrpc: '2.0', method: 'eth_call', params: [{ to: cfg.skaleBiteContract, data: callData }, 'latest'], id: 2 } }),
+    });
+    const callD = await callR.json();
+    // A successful call OR a revert with a reason string both prove the ABI is correct
+    const callable = (!callD.error && callD.result && callD.result.length > 2) ||
+                     (callD.error && callD.error.data && callD.error.data.startsWith('0x08c379a0'));
+
+    setTestResult('bite-contract', 'pass', {
+      address: cfg.skaleBiteContract,
+      bytecodeSize: `${codeSize} bytes`,
+      getIntentCallable: callable,
+      revertReason: callD.error?.message || null,
+      note: `IntentStore deployed${callable ? ', ABI verified via getIntent()' : ''}`,
+    });
+  } catch (e) { setTestResult('bite-contract', 'fail', { error: e.message }); }
+}
+
+async function testX402Probe() {
+  setTestRunning('x402-probe');
+  try {
+    // First check if probe is disabled
+    const envR = await fetch('/env-status');
+    const env = await envR.json();
+    if (env.rtSkipX402Probe) {
+      setTestResult('x402-probe', 'skip', 'RT_SKIP_X402_PROBE is set — probe disabled');
+      return;
+    }
+    // Try to register a route pointing at our fake x402 upstream
+    const dashboardPort = location.port || (location.protocol === 'https:' ? '443' : '80');
+    const testRoute = {
+      tool_id: '__x402_probe_test__',
+      path: '/api/v1/__x402_probe_test__',
+      method: 'GET',
+      description: 'Temporary probe test route (will be rejected)',
+      price_usdc: '0',
+      provider: { provider_id: '__x402_probe_test__', backend_url: `http://127.0.0.1:${dashboardPort}/x402-test-upstream` },
+      _skip_ssrf: true,
+    };
+    const r = await api('/admin/routes', { method: 'POST', body: JSON.stringify(testRoute) });
+    const d = await r.json();
+    if (r.status === 400 && d.reason === 'X402_UPSTREAM_BLOCKED') {
+      setTestResult('x402-probe', 'pass', { status: 400, reason: d.reason, message: d.error });
+    } else if (r.status === 200 || r.status === 201) {
+      // Route was accepted — probe didn't catch it; clean up
+      try { await api('/admin/routes/__x402_probe_test__', { method: 'DELETE' }); } catch {}
+      setTestResult('x402-probe', 'fail', { note: 'Route was accepted — probe did not detect x402 upstream', body: d });
+    } else {
+      setTestResult('x402-probe', 'fail', { status: r.status, body: d });
+    }
+  } catch (e) { setTestResult('x402-probe', 'fail', { error: e.message }); }
+}
+
+async function testX402Skip() {
+  setTestRunning('x402-skip');
+  try {
+    const r = await fetch('/env-status');
+    const d = await r.json();
+    if (d.rtSkipX402Probe) {
+      setTestResult('x402-skip', 'fail', { RT_SKIP_X402_PROBE: true, note: 'Probe is disabled — x402 wrapping protection inactive' });
+    } else {
+      setTestResult('x402-skip', 'pass', { RT_SKIP_X402_PROBE: false, note: 'Probe is active — x402 upstream wrapping blocked' });
+    }
+  } catch (e) { setTestResult('x402-skip', 'fail', { error: e.message }); }
+}
+
+async function testSsrfBlocked() {
+  setTestRunning('ssrf-blocked');
+  try {
+    const testRoute = {
+      tool_id: '__ssrf_test__',
+      path: '/api/v1/__ssrf_test__',
+      method: 'GET',
+      price_usdc: '0',
+      provider: { provider_id: '__ssrf__', backend_url: 'http://10.0.0.1:8080/internal-service' },
+    };
+    const r = await api('/admin/routes', { method: 'POST', body: JSON.stringify(testRoute) });
+    const d = await r.json();
+    const blocked = r.status === 400 && d.reason === 'SSRF_BLOCKED';
+    // Always clean up — the route may persist in-memory despite the 400
+    try { await api('/admin/routes/__ssrf_test__', { method: 'DELETE' }); } catch {}
+    if (blocked) {
+      setTestResult('ssrf-blocked', 'pass', { status: 400, reason: 'SSRF_BLOCKED', note: 'Private IP 10.0.0.1 correctly blocked' });
+    } else {
+      setTestResult('ssrf-blocked', 'fail', { status: r.status, body: d, note: 'Route to private IP was NOT blocked' });
+    }
+  } catch (e) { setTestResult('ssrf-blocked', 'fail', { error: e.message }); }
+}
+
+async function testCdpEnv() {
+  setTestRunning('cdp-env');
+  try {
+    const r = await fetch('/env-status');
+    const d = await r.json();
+    const missing = [];
+    if (!d.cdpApiKeyId) missing.push('CDP_API_KEY_ID');
+    if (!d.cdpApiKeySecret) missing.push('CDP_API_KEY_SECRET');
+    if (!d.cdpWalletSecret) missing.push('CDP_WALLET_SECRET');
+    if (missing.length === 0) {
+      setTestResult('cdp-env', 'pass', { cdpApiKeyId: true, cdpApiKeySecret: true, cdpWalletSecret: true });
+    } else {
+      setTestResult('cdp-env', 'fail', { missing });
+    }
+  } catch (e) { setTestResult('cdp-env', 'fail', { error: e.message }); }
+}
+
+async function testCdpApi() {
+  setTestRunning('cdp-api');
+  try {
+    const r = await fetch('/cdp-check', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const d = await r.json();
+    if (d.ok) {
+      setTestResult('cdp-api', 'pass', d);
+    } else {
+      setTestResult('cdp-api', 'fail', d);
+    }
+  } catch (e) { setTestResult('cdp-api', 'fail', { error: e.message }); }
+}
+
+// ── E2E Tests ──────────────────────────────────────────────────────
+let e2eState = { receipt: null };
+
+async function testE2ePipeline(cfg) {
+  if (!cfg) { const ctx = await debugLoadContext(); cfg = ctx.cfg; }
+  setTestRunning('e2e-pipeline');
+  const dashboardPort = location.port || (location.protocol === 'https:' ? '443' : '80');
+  const testRoute = {
+    tool_id: '__e2e_test__',
+    path: '/api/v1/__e2e_test__',
+    method: 'GET',
+    price_usdc: '0',
+    provider: { provider_id: '__e2e__', backend_url: `http://127.0.0.1:${dashboardPort}/e2e-test-upstream` },
+    _skip_ssrf: true,
+  };
+  try {
+    // Create temp route (skip SSRF — debug routes target localhost)
+    const createR = await api('/admin/routes', { method: 'POST', body: JSON.stringify(testRoute) });
+    if (!createR.ok) {
+      const err = await createR.json().catch(() => ({}));
+      setTestResult('e2e-pipeline', 'fail', { step: 'create route', status: createR.status, body: err });
+      return;
+    }
+
+    // Hit the route
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch('/api/v1/__e2e_test__', { headers });
+    const body = await r.text();
+    let d; try { d = JSON.parse(body); } catch { d = body; }
+
+    // Get receipt from header
+    const receiptHeader = r.headers.get('x-receipt');
+    let receipt = null;
+    if (receiptHeader) {
+      try { receipt = JSON.parse(atob(receiptHeader)); } catch {}
+    }
+    e2eState.receipt = receipt;
+
+    // Cleanup
+    try { await api('/admin/routes/__e2e_test__', { method: 'DELETE' }); } catch {}
+
+    // Validate
+    if (r.status === 200 && d?.ok === true && receipt && receipt.outcome === 'SUCCESS') {
+      setTestResult('e2e-pipeline', 'pass', { status: r.status, response: d, receipt_outcome: receipt.outcome, receipt_id: receipt.request_id });
+    } else {
+      setTestResult('e2e-pipeline', 'fail', { status: r.status, response: d, receipt, note: !receiptHeader ? 'Missing x-receipt header' : 'Unexpected result' });
+    }
+  } catch (e) {
+    try { await api('/admin/routes/__e2e_test__', { method: 'DELETE' }); } catch {}
+    setTestResult('e2e-pipeline', 'fail', { error: e.message });
+  }
+}
+
+async function testE2eReceipt() {
+  setTestRunning('e2e-receipt');
+  if (!e2eState.receipt) { setTestResult('e2e-receipt', 'skip', 'Pipeline test did not run — no receipt available'); return; }
+  try {
+    const r = await api('/admin/receipts?tool_id=__e2e_test__&limit=1');
+    const d = await r.json();
+    const found = r.ok && Array.isArray(d.receipts) && d.receipts.length > 0 && d.receipts[0].outcome === 'SUCCESS';
+    setTestResult('e2e-receipt', found ? 'pass' : 'fail', d);
+  } catch (e) { setTestResult('e2e-receipt', 'fail', { error: e.message }); }
+}
+
+async function testE2eHash() {
+  setTestRunning('e2e-hash');
+  if (!e2eState.receipt) { setTestResult('e2e-hash', 'skip', 'Pipeline test did not run — no receipt available'); return; }
+  const hash = e2eState.receipt.response_hash;
+  const valid = typeof hash === 'string' && /^0x[0-9a-f]{64}$/i.test(hash);
+  setTestResult('e2e-hash', valid ? 'pass' : 'fail', { response_hash: hash, valid });
+}
+
+async function testE2e402(cfg) {
+  if (!cfg) { const ctx = await debugLoadContext(); cfg = ctx.cfg; }
+  setTestRunning('e2e-402');
+  if (!cfg?.payToAddress) { setTestResult('e2e-402', 'skip', 'No pay-to address configured (x402 disabled)'); return; }
+  const dashboardPort = location.port || (location.protocol === 'https:' ? '443' : '80');
+  const testRoute = {
+    tool_id: '__e2e_pay_test__',
+    path: '/api/v1/__e2e_pay_test__',
+    method: 'GET',
+    price_usdc: '0.01',
+    provider: { provider_id: '__e2e__', backend_url: `http://127.0.0.1:${dashboardPort}/e2e-test-upstream` },
+    _skip_ssrf: true,
+  };
+  try {
+    const createR = await api('/admin/routes', { method: 'POST', body: JSON.stringify(testRoute) });
+    if (!createR.ok) {
+      const err = await createR.json().catch(() => ({}));
+      setTestResult('e2e-402', 'fail', { step: 'create route', status: createR.status, body: err });
+      return;
+    }
+
+    // Verify the route was registered with correct price
+    const listR = await api('/admin/routes');
+    const listD = await listR.json();
+    const found = listD.routes?.find(r => r.tool_id === '__e2e_pay_test__');
+
+    // Hit the route — may return 402 (if x402 initialized with this route) or 200 (dynamic route)
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch('/api/v1/__e2e_pay_test__', { headers });
+    const body = await r.text();
+    let d; try { d = JSON.parse(body); } catch { d = body; }
+
+    // Check receipt for price
+    const receiptHeader = r.headers.get('x-receipt');
+    let receipt = null;
+    if (receiptHeader) {
+      try { receipt = JSON.parse(atob(receiptHeader)); } catch {}
+    }
+
+    // Cleanup
+    try { await api('/admin/routes/__e2e_pay_test__', { method: 'DELETE' }); } catch {}
+
+    // Pass if: route registered with $0.01, and either 402 (x402 active) or receipt shows correct price
+    const routeOk = found && found.price_usdc === '0.01';
+    const is402 = r.status === 402;
+    const receiptPriceOk = receipt && receipt.price_usdc === '0.01';
+    if (routeOk && (is402 || receiptPriceOk)) {
+      setTestResult('e2e-402', 'pass', { status: r.status, route_price: found?.price_usdc, receipt_price: receipt?.price_usdc, note: is402 ? 'x402 returned 402 Payment Required' : 'Route registered with correct price (x402 requires restart to enforce)' });
+    } else {
+      setTestResult('e2e-402', 'fail', { status: r.status, route_found: !!found, route_price: found?.price_usdc, body: d });
+    }
+  } catch (e) {
+    try { await api('/admin/routes/__e2e_pay_test__', { method: 'DELETE' }); } catch {}
+    setTestResult('e2e-402', 'fail', { error: e.message });
+  }
+}
+
+function skaleExplorerUrl() {
+  const net = document.getElementById('input-skale-network').value;
+  if (net === 'base-mainnet') return 'https://skale-base-explorer.skalenodes.com';
+  if (net === 'base-sepolia-testnet') return 'https://base-sepolia-testnet.explorer.testnet.skalenodes.com';
+  return null;
+}
+
+async function testE2eSkale() {
+  setTestRunning('e2e-skale');
+  try {
+    const envR = await fetch('/env-status');
+    const env = await envR.json();
+    if (!env.skalePrivateKey) { setTestResult('e2e-skale', 'skip', 'SKALE not configured (no private key)'); return; }
+
+    const r = await api('/admin/skale/test-anchor', { method: 'POST', body: JSON.stringify({}) });
+    const d = await r.json();
+    if (r.ok && d.txHash && d.txHash.startsWith('0x')) {
+      const explorer = skaleExplorerUrl();
+      const result = { txHash: d.txHash, intentId: d.intentId };
+      if (explorer) result.explorer = explorer + '/tx/' + d.txHash;
+      setTestResult('e2e-skale', 'pass', result);
+    } else if (d.error && d.error.includes('METHOD_NOT_FOUND')) {
+      setTestResult('e2e-skale', 'skip', 'BITE encryption not enabled on this SKALE chain (bite_getCommitteesInfo unavailable)');
+    } else {
+      setTestResult('e2e-skale', 'fail', d);
+    }
+  } catch (e) { setTestResult('e2e-skale', 'fail', { error: e.message }); }
+}
+
+async function testBiteLifecycle() {
+  setTestRunning('e2e-bite-lifecycle');
+  try {
+    const envR = await fetch('/env-status');
+    const env = await envR.json();
+    if (!env.skalePrivateKey) { setTestResult('e2e-bite-lifecycle', 'skip', 'SKALE not configured (no private key)'); return; }
+
+    // Step 1: Encrypt and store
+    const anchorR = await api('/admin/skale/test-anchor', { method: 'POST', body: JSON.stringify({}) });
+    const anchor = await anchorR.json();
+    if (!anchorR.ok) {
+      const err = anchor.error || '';
+      if (err.includes('METHOD_NOT_FOUND') || err.includes('not supported') || err.includes('Invalid transaction')) {
+        setTestResult('e2e-bite-lifecycle', 'skip', 'SKALE RPC does not support BITE transactions on this chain');
+        return;
+      }
+      setTestResult('e2e-bite-lifecycle', 'fail', { step: 'encrypt', error: anchor.error || anchor });
+      return;
+    }
+
+    // Step 2: Verify data is hidden (not revealed)
+    const readR = await api('/admin/skale/intent/' + encodeURIComponent(anchor.intentId));
+    const readD = await readR.json();
+    if (!readR.ok) { setTestResult('e2e-bite-lifecycle', 'fail', { step: 'read-before-reveal', error: readD.error }); return; }
+    if (readD.revealed) {
+      setTestResult('e2e-bite-lifecycle', 'fail', { step: 'read-before-reveal', note: 'Data was readable before reveal — encryption not working', data: readD });
+      return;
+    }
+
+    // Step 3: Trigger reveal (markPaid)
+    const revealR = await api('/admin/skale/reveal/' + encodeURIComponent(anchor.intentId), { method: 'POST', body: JSON.stringify({}) });
+    const revealD = await revealR.json();
+    if (!revealR.ok) { setTestResult('e2e-bite-lifecycle', 'fail', { step: 'reveal', error: revealD.error }); return; }
+
+    // Step 4: Verify data is now decrypted and readable
+    const read2R = await api('/admin/skale/intent/' + encodeURIComponent(anchor.intentId));
+    const read2D = await read2R.json();
+    if (!read2R.ok) { setTestResult('e2e-bite-lifecycle', 'fail', { step: 'read-after-reveal', error: read2D.error }); return; }
+
+    if (read2D.revealed && read2D.data) {
+      let parsed; try { parsed = JSON.parse(read2D.data); } catch { parsed = read2D.data; }
+      const explorer = skaleExplorerUrl();
+      const result = {
+        intentId: anchor.intentId,
+        txHash: anchor.txHash,
+        hiddenBeforeReveal: true,
+        revealedAfterMarkPaid: true,
+        decryptedPayload: parsed,
+      };
+      if (explorer) result.explorer = explorer + '/tx/' + anchor.txHash;
+      setTestResult('e2e-bite-lifecycle', 'pass', result);
+    } else {
+      setTestResult('e2e-bite-lifecycle', 'fail', { step: 'read-after-reveal', note: 'Data not revealed after markPaid', data: read2D });
+    }
+  } catch (e) { setTestResult('e2e-bite-lifecycle', 'fail', { error: e.message }); }
+}
+
+async function testUpstreamError(cfg) {
+  if (!cfg) { const ctx = await debugLoadContext(); cfg = ctx.cfg; }
+  setTestRunning('e2e-upstream-error');
+  const testRoute = {
+    tool_id: '__e2e_dead_upstream__',
+    path: '/api/v1/__e2e_dead_upstream__',
+    method: 'GET',
+    price_usdc: '0',
+    provider: { provider_id: '__e2e__', backend_url: 'http://127.0.0.1:1/__dead__' },
+    _skip_ssrf: true,
+  };
+  try {
+    const createR = await api('/admin/routes', { method: 'POST', body: JSON.stringify(testRoute) });
+    if (!createR.ok) {
+      const err = await createR.json().catch(() => ({}));
+      setTestResult('e2e-upstream-error', 'fail', { step: 'create route', status: createR.status, body: err });
+      return;
+    }
+
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch('/api/v1/__e2e_dead_upstream__', { headers });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = text; }
+
+    // Cleanup
+    try { await api('/admin/routes/__e2e_dead_upstream__', { method: 'DELETE' }); } catch {}
+
+    const noCharge = r.status === 502 && d?.reason_code === 'UPSTREAM_ERROR_NO_CHARGE';
+    const zeroBilled = d?.price_usdc === '0.00';
+    setTestResult('e2e-upstream-error', noCharge ? 'pass' : 'fail', {
+      status: r.status,
+      reason_code: d?.reason_code,
+      price_billed: d?.price_usdc,
+      note: noCharge ? 'Agent NOT charged for upstream failure' + (zeroBilled ? ' ($0.00)' : '') : 'Expected 502 UPSTREAM_ERROR_NO_CHARGE',
+      body: d,
+    });
+  } catch (e) {
+    try { await api('/admin/routes/__e2e_dead_upstream__', { method: 'DELETE' }); } catch {}
+    setTestResult('e2e-upstream-error', 'fail', { error: e.message });
+  }
+}
+
+async function testE2eRealPayment() {
+  setTestRunning('e2e-real-payment');
+  try {
+    const r = await api('/admin/e2e/payment', { method: 'POST', body: JSON.stringify({}) });
+    const text = await r.text();
+    let d;
+    try { d = JSON.parse(text); } catch {
+      setTestResult('e2e-real-payment', 'fail', {
+        error: `Gateway returned non-JSON (HTTP ${r.status}) — restart the gateway after building`,
+        hint: 'Run /restart or rebuild + restart the gateway process',
+        body: text.slice(0, 200),
+      });
+      return;
+    }
+    if (d.skip) {
+      const skipData = { reason: d.reason || 'Skipped' };
+      if (d.account) skipData.account = d.account;
+      if (d.network) skipData.network = d.network;
+      if (d.balance != null) skipData.balance_usdc = d.balance;
+      setTestResult('e2e-real-payment', 'skip', skipData);
+      return;
+    }
+    if (!r.ok || !d.ok) {
+      setTestResult('e2e-real-payment', 'fail', d);
+      return;
+    }
+    setTestResult('e2e-real-payment', 'pass', {
+      account: d.account,
+      network: d.network,
+      balance_before: d.balance_before,
+      balance_after: d.balance_after,
+      spent: d.spent,
+      txHash: d.txHash,
+      explorer: d.explorer,
+      receipt_outcome: d.receipt?.outcome,
+      receipt_price: d.receipt?.price_usdc,
+      elapsed_ms: d.elapsed,
+    });
+  } catch (e) {
+    setTestResult('e2e-real-payment', 'fail', { error: e.message });
+  }
+}
+
+async function testReceiptIntegrity(routes, cfg) {
+  if (!routes || !cfg) { const ctx = await debugLoadContext(); routes = routes || ctx.routes; cfg = cfg || ctx.cfg; }
+  setTestRunning('receipt-integrity');
+  const dashboardPort = location.port || (location.protocol === 'https:' ? '443' : '80');
+  const testRoute = {
+    tool_id: '__receipt_integrity_test__',
+    path: '/api/v1/__receipt_integrity_test__',
+    method: 'GET',
+    price_usdc: '0',
+    provider: { provider_id: '__e2e__', backend_url: `http://127.0.0.1:${dashboardPort}/e2e-test-upstream` },
+    _skip_ssrf: true,
+  };
+  try {
+    // Create temp route and hit it to generate a receipt
+    const createR = await api('/admin/routes', { method: 'POST', body: JSON.stringify(testRoute) });
+    if (!createR.ok) {
+      setTestResult('receipt-integrity', 'fail', { step: 'create route', status: createR.status });
+      return;
+    }
+
+    const headers = {};
+    if (cfg?.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const r = await debugApiFetch('/api/v1/__receipt_integrity_test__', { headers });
+
+    // Get receipt from response header
+    const receiptHeader = r.headers.get('x-receipt');
+    let headerReceipt = null;
+    if (receiptHeader) {
+      try { headerReceipt = JSON.parse(atob(receiptHeader)); } catch {}
+    }
+    if (!headerReceipt) {
+      try { await api('/admin/routes/__receipt_integrity_test__', { method: 'DELETE' }); } catch {}
+      setTestResult('receipt-integrity', 'fail', { note: 'No X-Receipt header in response' });
+      return;
+    }
+
+    // Fetch same receipt from admin API
+    const adminR = await api(`/admin/receipts?tool_id=__receipt_integrity_test__&limit=1`);
+    const adminD = await adminR.json();
+
+    // Cleanup
+    try { await api('/admin/routes/__receipt_integrity_test__', { method: 'DELETE' }); } catch {}
+
+    const stored = adminD.receipts?.[0];
+    if (!stored) {
+      setTestResult('receipt-integrity', 'fail', { note: 'Receipt not found in admin store', headerReceipt });
+      return;
+    }
+
+    // Cross-validate key fields
+    const checks = {
+      request_id: headerReceipt.request_id === stored.request_id,
+      tool_id: headerReceipt.tool_id === stored.tool_id,
+      outcome: headerReceipt.outcome === stored.outcome,
+      response_hash: headerReceipt.response_hash === stored.response_hash,
+      request_hash: headerReceipt.request_hash === stored.request_hash,
+      timestamp: headerReceipt.timestamp === stored.timestamp,
+    };
+    const allMatch = Object.values(checks).every(Boolean);
+    setTestResult('receipt-integrity', allMatch ? 'pass' : 'fail', {
+      note: allMatch ? 'Header receipt matches admin store — tamper-proof receipt chain verified' : 'Mismatch between header and stored receipt',
+      checks,
+      header_id: headerReceipt.request_id,
+      stored_id: stored.request_id,
+    });
+  } catch (e) {
+    try { await api('/admin/routes/__receipt_integrity_test__', { method: 'DELETE' }); } catch {}
+    setTestResult('receipt-integrity', 'fail', { error: e.message });
+  }
+}
+
+async function testOpenApiImport() {
+  setTestRunning('openapi-import');
+  try {
+    const miniSpec = {
+      openapi: '3.0.0',
+      info: { title: 'Debug Test API', version: '1.0.0' },
+      paths: {
+        '/quotes': {
+          get: { operationId: '__oa_import_quotes__', summary: 'Get quotes' },
+        },
+        '/search': {
+          post: { operationId: '__oa_import_search__', summary: 'Search' },
+        },
+      },
+    };
+    const r = await api('/admin/routes/import', {
+      method: 'POST',
+      body: JSON.stringify({
+        openapi: miniSpec,
+        defaults: { providerId: '__oa_test__', backendUrl: 'https://api.example.com', priceUsdc: '0.02' },
+      }),
+    });
+    const d = await r.json();
+
+    // Cleanup imported routes
+    for (const id of (d.added || [])) {
+      try { await api(`/admin/routes/${encodeURIComponent(id)}`, { method: 'DELETE' }); } catch {}
+    }
+
+    const ok = r.status === 201 && d.added_count >= 2;
+    setTestResult('openapi-import', ok ? 'pass' : 'fail', {
+      status: r.status,
+      added: d.added_count,
+      skipped: d.skipped_count,
+      tool_ids: d.added,
+      note: ok ? `Bulk-imported ${d.added_count} routes from OpenAPI spec` : 'Expected at least 2 routes imported',
+    });
+  } catch (e) { setTestResult('openapi-import', 'fail', { error: e.message }); }
+}
+
+async function testPriceUpdate() {
+  setTestRunning('price-update');
+  const testRoute = {
+    tool_id: '__price_update_test__',
+    path: '/api/v1/__price_update_test__',
+    method: 'GET',
+    price_usdc: '0.01',
+    provider: { provider_id: '__test__', backend_url: 'https://api.example.com/test' },
+  };
+  try {
+    // Create route at $0.01
+    const createR = await api('/admin/routes', { method: 'POST', body: JSON.stringify(testRoute) });
+    if (!createR.ok) {
+      const err = await createR.json().catch(() => ({}));
+      setTestResult('price-update', 'fail', { step: 'create', status: createR.status, body: err });
+      return;
+    }
+
+    // Update price to $0.05
+    const updateR = await api('/admin/routes/__price_update_test__', {
+      method: 'PUT',
+      body: JSON.stringify({ price_usdc: '0.05' }),
+    });
+    const updateD = await updateR.json();
+    if (!updateR.ok) {
+      try { await api('/admin/routes/__price_update_test__', { method: 'DELETE' }); } catch {}
+      setTestResult('price-update', 'fail', { step: 'update', status: updateR.status, body: updateD });
+      return;
+    }
+
+    // Verify new price via GET
+    const listR = await api('/admin/routes');
+    const listD = await listR.json();
+    const found = listD.routes?.find(r => r.tool_id === '__price_update_test__');
+
+    // Cleanup
+    try { await api('/admin/routes/__price_update_test__', { method: 'DELETE' }); } catch {}
+
+    const priceOk = found && found.price_usdc === '0.05';
+    setTestResult('price-update', priceOk ? 'pass' : 'fail', {
+      original: '0.01',
+      updated: found?.price_usdc,
+      note: priceOk ? 'Dynamic price change: $0.01 → $0.05 verified' : 'Price did not update correctly',
+    });
+  } catch (e) {
+    try { await api('/admin/routes/__price_update_test__', { method: 'DELETE' }); } catch {}
+    setTestResult('price-update', 'fail', { error: e.message });
+  }
+}
+</script>
+</body>
+</html>

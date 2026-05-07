@@ -1,0 +1,427 @@
+import express from "express";
+import helmet from "helmet";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
+import { v4 as uuidv4 } from "uuid";
+import type { GatewayConfig } from "./config.js";
+import { type RouteRule, type CompiledRule, type CompileOptions, compileRoutes, matchRule, RouteNotFoundError } from "./routing.js";
+import { InMemoryReplayStore } from "./replay.js";
+import { SpendTracker, LifetimeSpendTracker, intentMandateId } from "./ap2.js";
+import { createIdempotencyMiddleware } from "./middleware/idempotency.js";
+import { createMandateMiddleware } from "./middleware/mandate.js";
+import { createPaymentSystem, type PaymentSystem } from "./middleware/payment.js";
+import { createBiteService } from "./bite.js";
+import { createReputationService } from "./services/reputation.js";
+import { forwardRequest } from "./services/proxy.js";
+import { ReceiptStore } from "./services/receipt-store.js";
+import { hashBytes } from "./hash.js";
+import { logger } from "./utils/logger.js";
+import { createAdminRouter } from "./admin-routes.js";
+import { ConfigStore } from "./services/config-store.js";
+import { generateAgentApiDocs } from "./services/docs-generator.js";
+import { Outcome, ReasonCode, type Receipt, HEADERS } from "@routefi/shared";
+
+// Headers that must not be forwarded to upstream
+const HOP_BY_HOP = new Set([
+  "host",
+  "connection",
+  "transfer-encoding",
+  "content-length",
+  "keep-alive",
+  "upgrade",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+]);
+
+const INTERNAL_HEADERS = new Set<string>([
+  HEADERS.IDEMPOTENCY_KEY,
+  HEADERS.MANDATE,
+  HEADERS.PAYMENT,
+  HEADERS.RECEIPT,
+]);
+
+export interface RouteManager {
+  getRoutes(): RouteRule[];
+  getCompiled(): CompiledRule[];
+  addRoute(rule: RouteRule, opts?: CompileOptions): void;
+  removeRoute(toolId: string): boolean;
+}
+
+export interface CreateAppOptions {
+  config: GatewayConfig;
+  routes: RouteRule[];
+}
+
+export function createApp({ config, routes }: CreateAppOptions) {
+  const app = express();
+
+  // Security middleware
+  app.use(helmet());
+  app.use(cors());
+  app.use(rateLimit({ windowMs: 60_000, max: 100 }));
+  app.use(express.json());
+
+  // Services
+  const replayStore = new InMemoryReplayStore();
+  const spendTracker = new SpendTracker();
+  const lifetimeTracker = new LifetimeSpendTracker();
+  const receiptStore = new ReceiptStore();
+  const biteService = createBiteService(config);
+  const reputationService = createReputationService(config);
+  const paymentSystem: PaymentSystem = createPaymentSystem(config, routes);
+  const startTime = Date.now();
+
+  // Config persistence
+  const routesFile = process.env.RT_ROUTES_FILE || "./routes.json";
+  const configFilePath = routesFile.replace(/\.json$/, "") + ".rt-config.json";
+  const configStore = new ConfigStore(configFilePath.startsWith(".") ? "./rt-config.json" : configFilePath);
+
+  // Apply persisted config on startup, seeding from env vars if not set
+  const persistedConfig = configStore.load();
+  if (persistedConfig.payToAddress) {
+    (config as any).payToAddress = persistedConfig.payToAddress;
+  }
+  if (persistedConfig.baseNetwork) {
+    (config as any).baseNetwork = persistedConfig.baseNetwork;
+  }
+  // Seed dashboard config from env vars if fields are empty
+  let needsSave = false;
+  if (!persistedConfig.payToAddress && config.payToAddress) {
+    persistedConfig.payToAddress = config.payToAddress;
+    needsSave = true;
+  }
+  if (!persistedConfig.baseNetwork && config.baseNetwork) {
+    persistedConfig.baseNetwork = config.baseNetwork;
+    needsSave = true;
+  }
+  if (config.skaleRpcUrl && persistedConfig.skaleRpcUrl !== config.skaleRpcUrl) {
+    persistedConfig.skaleRpcUrl = config.skaleRpcUrl;
+    needsSave = true;
+  }
+  if (config.skaleBiteContract && persistedConfig.skaleBiteContract !== config.skaleBiteContract) {
+    persistedConfig.skaleBiteContract = config.skaleBiteContract;
+    needsSave = true;
+  }
+  if (config.skaleChainId) {
+    const networkLabel = config.skaleChainId === 974399131 ? "calypso-testnet"
+      : config.skaleChainId === 1351057110 ? "staging-v3"
+      : config.skaleChainId === 324705682 ? "base-sepolia-testnet"
+      : config.skaleChainId === 1187947933 ? "base-mainnet" : "mainnet";
+    if (!persistedConfig.skaleNetwork || persistedConfig.skaleNetwork !== networkLabel) {
+      persistedConfig.skaleNetwork = networkLabel;
+      needsSave = true;
+    }
+  }
+  if (needsSave) {
+    try { configStore.save(persistedConfig); } catch {}
+  }
+
+  // Mutable route manager
+  let currentRoutes = [...routes];
+  let currentCompiled = compileRoutes(currentRoutes);
+  const routeManager: RouteManager = {
+    getRoutes: () => [...currentRoutes],
+    getCompiled: () => currentCompiled,
+    addRoute(rule: RouteRule, opts?: CompileOptions) {
+      // Stamp per-route SSRF bypass so recompilation respects it
+      if (opts?.skipSsrf) rule._skipSsrf = true;
+      const existing = currentRoutes.findIndex((r) => r.tool_id === rule.tool_id);
+      // Build candidate array and compile BEFORE mutating currentRoutes
+      // so a compile failure (e.g. SSRF) doesn't leave a zombie route.
+      const candidate = [...currentRoutes];
+      if (existing !== -1) {
+        candidate[existing] = rule;
+      } else {
+        candidate.push(rule);
+      }
+      const compiled = compileRoutes(candidate, opts);
+      currentRoutes = candidate;
+      currentCompiled = compiled;
+    },
+    removeRoute(toolId: string) {
+      const idx = currentRoutes.findIndex((r) => r.tool_id === toolId);
+      if (idx === -1) return false;
+      currentRoutes.splice(idx, 1);
+      currentCompiled = compileRoutes(currentRoutes);
+      return true;
+    },
+  };
+
+  // Health endpoint (public)
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
+
+  // Public API docs endpoint
+  app.get("/docs", (_req, res) => {
+    const dashConfig = configStore.load();
+    const spec = generateAgentApiDocs(
+      routeManager.getRoutes(),
+      dashConfig.routeGroups || [],
+      {
+        baseUrl: `${_req.protocol}://${_req.get("host") || "localhost:" + config.port}`,
+        payToAddress: dashConfig.payToAddress || config.payToAddress,
+      },
+    );
+    res.json(spec);
+  });
+
+  // Admin API
+  app.use("/admin", createAdminRouter({ routeManager, receiptStore, spendTracker, lifetimeTracker, config, configStore, startTime, biteService, reputationService, paymentSystem }));
+
+  // Gateway routes - catch all non-health requests
+  // NOTE: must use app.all (not app.use) so req.path retains the full path
+  app.all("/api/*", async (req, res) => {
+    const requestId = uuidv4();
+    (req as any).requestId = requestId;
+    const startTime = performance.now();
+
+    // Record a DENIED receipt when x402 sends a 402 (payment required)
+    res.on("finish", () => {
+      if (res.statusCode === 402 && !(req as any)._receiptRecorded) {
+        const matchResult = (req as any)._matchResult;
+        if (matchResult) {
+          const receipt: Receipt = {
+            request_id: requestId,
+            tool_id: matchResult.rule.tool_id,
+            provider_id: matchResult.rule.provider.provider_id,
+            endpoint: req.path,
+            method: req.method,
+            timestamp: new Date().toISOString(),
+            price_usdc: matchResult.rule.price_usdc,
+            currency: "USDC",
+            chain: config.baseNetwork,
+            mandate_id: null,
+            mandate_hash: null,
+            mandate_verdict: "SKIPPED",
+            reason_code: ReasonCode.INVALID_PAYMENT,
+            payment_tx_hash: null,
+            facilitator_receipt_id: null,
+            request_hash: (req as any).requestHash || "",
+            response_hash: null,
+            latency_ms: null,
+            outcome: Outcome.DENIED,
+            explanation: "Payment required — $" + matchResult.rule.price_usdc + " USDC",
+          };
+          receiptStore.add(receipt);
+        }
+      }
+    });
+
+    // 0. API key verification (if configured)
+    const dashConfig = configStore.load();
+    if (dashConfig.apiKey) {
+      const authHeader = req.headers["authorization"] || "";
+      const xApiKey = req.headers["x-api-key"] || "";
+      const provided = authHeader.replace(/^Bearer\s+/i, "") || xApiKey;
+      if (provided !== dashConfig.apiKey) {
+        res.status(401).json({
+          request_id: requestId,
+          outcome: Outcome.DENIED,
+          reason_code: ReasonCode.UNAUTHORIZED,
+          explanation: "Invalid or missing API key. Provide via Authorization: Bearer <key> or X-Api-Key header.",
+        });
+        return;
+      }
+    }
+
+    // 0.5 Agent blacklist check
+    const agentAddress = (req.headers["x-agent-address"] as string) || "";
+    if (agentAddress) {
+      const blacklist: string[] = dashConfig.blacklist || [];
+      if (blacklist.includes(agentAddress.toLowerCase())) {
+        res.status(403).json({
+          request_id: requestId,
+          outcome: Outcome.DENIED,
+          reason_code: ReasonCode.AGENT_BLOCKED,
+          explanation: `Agent ${agentAddress} is blacklisted`,
+        });
+        return;
+      }
+    }
+
+    // 0.6 ERC-8004 reputation check
+    const agentIdHeader = req.headers["x-agent-id"] as string;
+    if (agentIdHeader && reputationService) {
+      try {
+        const rep = await reputationService.checkReputation(BigInt(agentIdHeader));
+        if (!rep.allowed) {
+          res.status(403).json({
+            request_id: requestId,
+            outcome: Outcome.DENIED,
+            reason_code: ReasonCode.LOW_REPUTATION,
+            explanation: `Agent reputation too low (score: ${rep.score}, min: ${config.erc8004MinScore})`,
+          });
+          return;
+        }
+      } catch (err: any) {
+        logger.warn("ERC-8004 reputation check failed (allowing request)", { error: err.message });
+      }
+    }
+
+    // 1. Route matching
+    let matchResult;
+    try {
+      matchResult = matchRule(routeManager.getCompiled(), req.method, req.path);
+    } catch (err) {
+      if (err instanceof RouteNotFoundError) {
+        const receipt: Receipt = {
+          request_id: requestId,
+          tool_id: "unknown",
+          provider_id: "unknown",
+          endpoint: req.path,
+          method: req.method,
+          timestamp: new Date().toISOString(),
+          price_usdc: "0.00",
+          currency: "USDC",
+          chain: config.baseNetwork,
+          mandate_id: null,
+          mandate_hash: null,
+          mandate_verdict: "SKIPPED",
+          reason_code: ReasonCode.ROUTE_NOT_FOUND,
+          payment_tx_hash: null,
+          facilitator_receipt_id: null,
+          request_hash: "",
+          response_hash: null,
+          latency_ms: null,
+          outcome: Outcome.DENIED,
+          explanation: `No route found for ${req.method} ${req.path}`,
+        };
+        receiptStore.add(receipt);
+        res.status(404).json(receipt);
+        return;
+      }
+      throw err;
+    }
+
+    // Store route info on request
+    (req as any).toolId = matchResult.rule.tool_id;
+    (req as any).providerId = matchResult.rule.provider.provider_id;
+    (req as any).routePrice = matchResult.price;
+    (req as any)._matchResult = matchResult;
+
+    // 2. Idempotency check
+    const idempotencyMw = createIdempotencyMiddleware(replayStore, config);
+    const idempotencyResult = await new Promise<boolean>((resolve) => {
+      idempotencyMw(req, res, () => resolve(true));
+      // If middleware sends response, promise won't resolve via next()
+      if (res.headersSent) resolve(false);
+    });
+    if (!idempotencyResult) return;
+
+    // 3. Mandate verification
+    const mandateMw = createMandateMiddleware(spendTracker, lifetimeTracker, config);
+    const mandateResult = await new Promise<boolean>((resolve) => {
+      mandateMw(req, res, () => resolve(true));
+      if (res.headersSent) resolve(false);
+    });
+    if (!mandateResult) return;
+
+    // 4. Payment verification (x402)
+    const paymentResult = await new Promise<boolean>((resolve) => {
+      paymentSystem.middleware(req, res, () => resolve(true));
+      if (res.headersSent) resolve(false);
+    });
+    if (!paymentResult) return;
+
+    // 5. Proxy to upstream
+    try {
+      // Build forwarded headers: all client headers minus hop-by-hop and internal
+      const proxyHeaders: Record<string, string> = {};
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (HOP_BY_HOP.has(key) || INTERNAL_HEADERS.has(key)) continue;
+        if (typeof value === "string") {
+          proxyHeaders[key] = value;
+        } else if (Array.isArray(value)) {
+          proxyHeaders[key] = value.join(", ");
+        }
+      }
+
+      // Preserve query string for upstream
+      const qsIndex = req.originalUrl.indexOf("?");
+      const queryString = qsIndex >= 0 ? req.originalUrl.substring(qsIndex) : "";
+
+      const proxyRes = await forwardRequest(
+        matchResult.rule.provider,
+        req.method,
+        req.path,
+        proxyHeaders,
+        req.body,
+        queryString,
+      );
+
+      // 6. Settle payment after successful proxy
+      const settlement = await paymentSystem.settle(req);
+
+      const latencyMs = Math.round(performance.now() - startTime);
+      const responseHash = hashBytes(JSON.stringify(proxyRes.data));
+
+      const m = (req as any).mandate;
+      const resolvedMandateId = m ? (m.type === "IntentMandate" ? intentMandateId(m.contents) : m.mandate_id) : null;
+
+      const receipt: Receipt = {
+        request_id: requestId,
+        tool_id: matchResult.rule.tool_id,
+        provider_id: matchResult.rule.provider.provider_id,
+        endpoint: req.path,
+        method: req.method,
+        timestamp: new Date().toISOString(),
+        price_usdc: matchResult.price,
+        currency: "USDC",
+        chain: config.baseNetwork,
+        mandate_id: resolvedMandateId,
+        mandate_hash: null,
+        mandate_verdict: (req as any).mandateVerdict || "SKIPPED",
+        reason_code: ReasonCode.OK,
+        payment_tx_hash: settlement.txHash,
+        facilitator_receipt_id: settlement.txHash,
+        request_hash: (req as any).requestHash || "",
+        response_hash: responseHash,
+        latency_ms: latencyMs,
+        outcome: Outcome.SUCCESS,
+        explanation: "Request processed successfully",
+      };
+
+      receiptStore.add(receipt);
+      (req as any)._receiptRecorded = true;
+      res.setHeader(HEADERS.RECEIPT, Buffer.from(JSON.stringify(receipt)).toString("base64"));
+      res.status(proxyRes.status).json(proxyRes.data);
+    } catch (err: any) {
+      const latencyMs = Math.round(performance.now() - startTime);
+      logger.error("Proxy error", { error: String(err) });
+
+      const mErr = (req as any).mandate;
+      const errMandateId = mErr ? (mErr.type === "IntentMandate" ? intentMandateId(mErr.contents) : mErr.mandate_id) : null;
+
+      const receipt: Receipt = {
+        request_id: requestId,
+        tool_id: matchResult.rule.tool_id,
+        provider_id: matchResult.rule.provider.provider_id,
+        endpoint: req.path,
+        method: req.method,
+        timestamp: new Date().toISOString(),
+        price_usdc: "0.00",
+        currency: "USDC",
+        chain: config.baseNetwork,
+        mandate_id: errMandateId,
+        mandate_hash: null,
+        mandate_verdict: (req as any).mandateVerdict || "SKIPPED",
+        reason_code: ReasonCode.UPSTREAM_ERROR_NO_CHARGE,
+        payment_tx_hash: null,
+        facilitator_receipt_id: null,
+        request_hash: (req as any).requestHash || "",
+        response_hash: null,
+        latency_ms: latencyMs,
+        outcome: Outcome.ERROR,
+        explanation: `Upstream error: ${err.message}`,
+      };
+      receiptStore.add(receipt);
+      (req as any)._receiptRecorded = true;
+      res.status(502).json(receipt);
+    }
+  });
+
+  return { app, replayStore, receiptStore, spendTracker, lifetimeTracker, routeManager };
+}

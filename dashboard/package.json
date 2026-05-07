@@ -1,0 +1,12 @@
+{
+  "name": "routefi-router-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Admin dashboard for Routefi Router Gateway",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

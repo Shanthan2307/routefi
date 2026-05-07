@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Docs - Routefi Router</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+      --green: #3fb950; --red: #f85149; --orange: #d29922;
+      --purple: #bc8cff; --radius: 8px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+      height: 100vh; display: flex; flex-direction: column;
+    }
+
+    /* Nav */
+    nav {
+      display: flex; align-items: center; gap: 16px;
+      padding: 16px 24px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    nav img { height: 48px; display: block; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 18px; cursor: pointer; }
+    nav a:hover { color: var(--text); }
+    nav a.active { color: #2acc91; font-weight: 600; }
+    nav .sep { color: var(--border); font-size: 20px; }
+    .admin-label {
+      font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+      padding: 3px 10px; border-radius: 4px;
+      background: #58a6ff22; color: var(--accent); border: 1px solid #58a6ff44;
+    }
+    nav .spacer { flex: 1; }
+    .network-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 1px;
+      padding: 3px 8px; border-radius: 4px; margin-right: 4px;
+    }
+    .network-label.testnet { background: transparent; color: var(--orange); border: 1px solid var(--orange); }
+    .network-label.testnet::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); margin-right: 5px; vertical-align: -1px; }
+    .network-label.mainnet { background: transparent; color: var(--green); border: 1px solid var(--orange); }
+    .network-label.mainnet::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 5px; vertical-align: -1px; }
+    .network-label.connected { background: transparent; color: var(--green); border: 1px solid var(--green); }
+    .network-label.connected::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 5px; vertical-align: -1px; }
+
+    /* Settings */
+    .settings-wrapper { position: relative; }
+    .settings-btn {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 7px 14px; border-radius: 6px; cursor: pointer;
+      font-size: 15px; color: #2acc91; transition: border-color .2s, color .2s;
+    }
+    .settings-btn:hover { border-color: #2acc91; color: #2acc91; }
+    .settings-btn .cog { width: 18px; height: 18px; transition: transform .3s; }
+    .settings-btn:hover .cog { transform: rotate(45deg); }
+    .settings-dropdown {
+      display: none; position: absolute; right: 0; top: calc(100% + 8px);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); width: 600px; z-index: 100;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4); max-height: 80vh;
+      flex-direction: column;
+    }
+    .settings-dropdown.open { display: flex; }
+    .settings-dropdown-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+      font-size: 15px; font-weight: 600; flex-shrink: 0;
+    }
+    .settings-tabs {
+      display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0;
+      background: var(--bg); padding: 0 12px;
+    }
+    .settings-tab {
+      padding: 10px 16px; font-size: 13px; font-weight: 600; color: var(--muted);
+      cursor: pointer; border: none; background: none; letter-spacing: 0.5px;
+      border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+    }
+    .settings-tab:hover { color: var(--text); }
+    .settings-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .settings-tab-panel { display: none; }
+    .settings-tab-panel.active { display: flex; flex-direction: column; gap: 14px; }
+    .settings-dropdown-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+    .settings-section-label {
+      font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase;
+      letter-spacing: 1px; padding-top: 14px; margin-top: 4px; border-top: 1px solid var(--border);
+    }
+    .field-group label {
+      display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px;
+      text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+    }
+    .field-group input, .field-group select {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 10px; color: var(--text);
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace; font-size: 14px;
+    }
+    .field-group input:focus, .field-group select:focus { outline: none; border-color: var(--accent); }
+    .test-btn {
+      background: #238636; color: #fff; border: 1px solid #2ea04366;
+      padding: 7px 16px; border-radius: 6px; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: background .15s; width: 100%;
+    }
+    .test-btn:hover { background: #2ea043; }
+    .test-result { font-size: 14px; margin-top: 4px; }
+
+    /* Layout */
+    .layout { display: flex; flex: 1; overflow: hidden; }
+    .panel-left {
+      width: 400px; min-width: 400px;
+      border-right: 1px solid var(--border);
+      overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .panel-right { flex: 1; overflow-y: auto; padding: 20px; }
+
+    /* Connection box */
+    .conn-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .conn-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      font-size: 14px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .conn-dot.online { background: var(--green); }
+    .conn-dot.offline { background: var(--red); }
+    .conn-dot.loading { background: var(--orange); }
+    .conn-body { padding: 12px 14px; }
+    .conn-row { display: flex; gap: 8px; font-size: 14px; margin-bottom: 8px; }
+    .conn-row:last-child { margin-bottom: 0; }
+    .conn-label { color: var(--muted); min-width: 80px; flex-shrink: 0; }
+    .conn-value {
+      color: var(--text); word-break: break-all;
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace; font-size: 13px;
+    }
+
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px;
+    }
+    .stat-label {
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 26px; font-weight: 700;
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    }
+
+    a.tx-link { color: var(--accent); text-decoration: none; }
+    a.tx-link:hover { text-decoration: underline; }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      margin-top: auto; padding: 12px 6px 6px;
+      border-top: 1px solid var(--border); font-size: 11px; color: var(--muted);
+    }
+    .sidebar-footer .footer-title { font-weight: 600; font-size: 12px; margin-bottom: 8px; }
+    .sidebar-footer .footer-links {
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    }
+    .sidebar-footer .footer-links a {
+      color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; transition: color .15s;
+    }
+    .sidebar-footer .footer-links a:hover { color: var(--text); }
+    .sidebar-footer .footer-links svg { width: 14px; height: 14px; }
+
+    /* Docs content */
+    .docs-content { padding: 20px; }
+    .docs-content h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .docs-content .docs-subtitle { color: var(--muted); font-size: 15px; margin-bottom: 32px; }
+
+    .doc-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+      border-left: 3px solid var(--accent);
+    }
+    .doc-card h2 {
+      font-size: 18px; font-weight: 600; margin-bottom: 4px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .doc-card h2 a {
+      color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 400;
+    }
+    .doc-card h2 a:hover { text-decoration: underline; }
+    .doc-card .doc-desc { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+    .doc-card .doc-usage {
+      font-size: 13px; color: var(--text); padding: 8px 12px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; line-height: 1.6;
+    }
+    .doc-card .doc-usage strong { color: var(--green); font-weight: 600; }
+
+    /* API Docs section */
+    .api-docs-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .api-docs-header h1 { margin-bottom: 0; }
+    .api-docs-actions { display: flex; gap: 8px; align-items: center; }
+    .api-docs-actions button {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
+      transition: border-color .15s;
+    }
+    .api-docs-actions button:hover { border-color: var(--accent); color: var(--accent); }
+    .api-docs-actions .btn-green { background: #238636; color: #fff; border-color: #2ea04366; }
+    .api-docs-actions .btn-green:hover { background: #2ea043; border-color: #2ea043; color: #fff; }
+    .method-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    }
+    .method-badge.get { background: #238636; color: #fff; }
+    .method-badge.post { background: #1a6eff; color: #fff; }
+    .method-badge.put { background: #d29922; color: #fff; }
+    .method-badge.delete { background: #f85149; color: #fff; }
+    .method-badge.patch { background: #bc8cff; color: #fff; }
+    .route-path {
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+      font-size: 14px; color: var(--text); margin-left: 8px;
+    }
+    .route-meta {
+      display: flex; gap: 12px; align-items: center; margin-top: 8px;
+      font-size: 12px; color: var(--muted);
+    }
+    .route-price {
+      color: var(--green); font-weight: 600;
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    }
+    .route-tag {
+      padding: 2px 8px; border-radius: 4px; font-size: 11px;
+      background: #58a6ff22; color: var(--accent); border: 1px solid #58a6ff44;
+    }
+    .api-section-divider {
+      margin: 40px 0 32px; padding-top: 32px; border-top: 2px solid var(--border);
+    }
+    .no-routes-msg {
+      color: var(--muted); font-size: 14px; padding: 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); text-align: center;
+    }
+    .openapi-link {
+      font-size: 12px; color: var(--muted); margin-top: 4px;
+      font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    }
+    .openapi-link a { color: var(--accent); text-decoration: none; }
+    .openapi-link a:hover { text-decoration: underline; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/routes"><img src="/logo.png" alt="Routefi" /></a>
+  <span class="admin-label">ROUTER ADMIN</span>
+  <span class="sep">/</span>
+  <a href="/routes">ROUTES</a>
+  <span class="sep">/</span>
+  <a href="/requests">REQUESTS</a>
+  <span class="sep">/</span>
+  <a href="/debug">DEBUG</a>
+  <span class="sep">/</span>
+  <a href="/docs" class="active">DOCS</a>
+  <span class="spacer"></span>
+  <span class="network-label" id="label-base">BASE TESTNET</span>
+  <span class="network-label" id="label-skale">SKALE TESTNET</span>
+  <div class="settings-wrapper">
+    <button class="settings-btn" onclick="toggleSettings()">
+      <svg class="cog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      SETTINGS
+    </button>
+    <div class="settings-dropdown" id="settings-dropdown">
+      <div class="settings-dropdown-header">
+        <span>SETTINGS</span>
+        <div style="display:flex;gap:6px;margin-left:auto">
+          <button class="test-btn" style="margin:0;padding:3px 10px;font-size:11px" onclick="loadDemoPreset('testnet')">Testnet</button>
+          <button class="test-btn" style="margin:0;padding:3px 10px;font-size:11px;background:#1a6eff;border-color:#1a6eff" onclick="loadDemoPreset('mainnet')">Mainnet</button>
+        </div>
+      </div>
+      <div class="settings-tabs">
+        <button class="settings-tab active" onclick="switchSettingsTab('api')">API Provider</button>
+        <button class="settings-tab" onclick="switchSettingsTab('base')">Base L2</button>
+        <button class="settings-tab" onclick="switchSettingsTab('skale')">SKALE</button>
+      </div>
+      <div class="settings-dropdown-body">
+        <!-- API Provider -->
+        <div class="settings-tab-panel active" id="stab-api">
+          <div style="font-size:12px;color:var(--muted)">Connect your existing API provider to proxy requests through the gateway.</div>
+          <div class="field-group">
+            <label>API Key</label>
+            <input type="password" id="input-api-key" placeholder="sk-..." value="" />
+          </div>
+        </div>
+        <!-- Base L2 -->
+        <div class="settings-tab-panel" id="stab-base">
+          <div style="font-size:12px;color:var(--muted)">Configure the Base L2 wallet that receives x402 payments and pays network fees.</div>
+          <div class="field-group">
+            <label>Wallet Address</label>
+            <input type="text" id="input-wallet-address" placeholder="0x..." />
+          </div>
+          <div class="field-group">
+            <label>Network</label>
+            <select id="input-base-network">
+              <option value="base-sepolia">base-sepolia (Testnet)</option>
+              <option value="base">base (Mainnet)</option>
+            </select>
+          </div>
+          <button class="test-btn" onclick="testWallet()">Test Wallet Connection</button>
+          <div class="test-result" id="test-wallet-result"></div>
+        </div>
+        <!-- SKALE -->
+        <div class="settings-tab-panel" id="stab-skale">
+          <div style="font-size:12px;color:var(--muted)">SKALE network settings for BITE threshold encryption (zero gas fees).</div>
+          <div class="field-group">
+            <label>SKALE Network</label>
+            <select id="input-skale-network">
+              <option value="base-sepolia-testnet">Base Sepolia (Testnet, BITE)</option>
+              <option value="base-mainnet">SKALE Base (Mainnet, BITE)</option>
+              <option value="calypso-testnet">Calypso Hub (Testnet)</option>
+              <option value="staging-v3">Chaos (Testnet)</option>
+              <option value="mainnet">mainnet</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label>SKALE RPC URL</label>
+            <input type="text" id="input-skale-rpc" placeholder="https://..." />
+          </div>
+          <div class="field-group">
+            <label>BITE Contract Address</label>
+            <input type="text" id="input-skale-contract" placeholder="0x..." />
+          </div>
+          <button class="test-btn" onclick="testSkale()">Test SKALE Connection</button>
+          <div class="test-result" id="test-skale-result"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- Left Panel -->
+  <div class="panel-left">
+    <div class="conn-box">
+      <div class="conn-header">
+        <span class="conn-dot loading" id="conn-dot"></span>
+        <span id="conn-label">Checking gateway...</span>
+      </div>
+      <div class="conn-body">
+        <div class="conn-row">
+          <span class="conn-label">Status</span>
+          <span class="conn-value" id="conn-status">Connecting...</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">Uptime</span>
+          <span class="conn-value" id="conn-uptime">-</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">Routes</span>
+          <span class="conn-value" id="conn-routes">-</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">Requests</span>
+          <span class="conn-value" id="conn-receipts">-</span>
+        </div>
+        <div class="conn-row" id="conn-endpoint-row" style="display:none">
+          <span class="conn-label">Endpoint</span>
+          <span class="conn-value"><a class="tx-link" id="conn-endpoint" href="#" target="_blank">-</a></span>
+        </div>
+        <div class="conn-row" id="conn-docs-row" style="display:none">
+          <span class="conn-label">API Docs</span>
+          <span class="conn-value"><a class="tx-link" id="conn-docs" href="#" target="_blank">-</a></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn-box">
+      <div class="conn-header" style="justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="conn-dot loading" id="platform-dot"></span>
+          <span>Platform Connections</span>
+        </div>
+        <svg style="width:16px;height:16px;cursor:pointer;color:var(--muted)" onclick="toggleSettings()" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <div class="conn-body">
+        <div class="conn-row">
+          <span class="conn-label">Base L2</span>
+          <span class="conn-value" id="plat-base">Not connected</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">SKALE</span>
+          <span class="conn-value" id="plat-skale">Not connected</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-label">CDP</span>
+          <span class="conn-value" id="plat-cdp">Not configured</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Revenue</div>
+        <div class="stat-value"><span id="stat-usdc" style="color:var(--green)">-</span> <span style="color:var(--green);font-size:14px;font-weight:400">USDC</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="footer-title">Routefi Router v1.0</div>
+      <div class="footer-links">
+        <a href="https://x.com/Routefi" target="_blank" title="X.com">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+        <a href="https://github.com/Routefi/Routefi-Router" target="_blank" title="GitHub">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+        <a href="https://Routefi.ai" target="_blank" title="Website">Routefi.ai</a>
+        <a href="https://dorahacks.io/hackathon/x402/" target="_blank" title="x402 Hackathon">x402 Hackathon</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right Panel -->
+  <div class="panel-right">
+    <div class="docs-content">
+      <!-- Dynamic API Documentation -->
+      <div id="api-docs-section">
+        <div class="api-docs-header">
+          <h1 id="api-docs-title">API Documentation</h1>
+          <div class="api-docs-actions">
+            <button onclick="copyOpenApiUrl()">Copy OpenAPI URL</button>
+            <button onclick="downloadOpenApi()">Download JSON</button>
+            <button class="btn-green" onclick="refreshApiDocs()">Regenerate</button>
+          </div>
+        </div>
+        <div class="docs-subtitle" id="api-docs-desc">Loading API documentation...</div>
+        <div class="openapi-link" id="api-docs-link"></div>
+        <div id="api-docs-routes"></div>
+      </div>
+
+      <div class="api-section-divider"></div>
+
+      <h1>Technology Documentation</h1>
+      <div class="docs-subtitle">Protocols, platforms, and tools used by Routefi Router. Please refer to the project <a href="https://github.com/Routefi/Routefi-Router#readme" target="_blank" style="color:var(--accent)">README.md</a> for full detailed setup instructions.</div>
+
+      <div class="doc-card">
+        <h2>x402 Protocol <a href="https://www.x402.org/" target="_blank">x402.org</a></h2>
+        <div class="doc-desc">HTTP 402 payment standard for machine-to-machine payments.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> The gateway returns HTTP 402 with payment requirements when an agent calls a priced route without payment. Agents pay via the x402 facilitator, and the gateway verifies payment before proxying.</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>Base L2 (Coinbase) <a href="https://base.org/" target="_blank">base.org</a></h2>
+        <div class="doc-desc">Ethereum L2 built by Coinbase for fast, low-cost transactions.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> All x402 payment settlements happen on Base. Supports both Base Testnet and Base Mainnet for USDC transfers.</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>SKALE Network <a href="https://skale.space/" target="_blank">skale.space</a></h2>
+        <div class="doc-desc">Zero-gas EVM-compatible blockchain network.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> SKALE hosts the BITE protocol for encrypted intents. We deploy to the Calypso Hub for threshold encryption of premium API content with zero gas fees.</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>BITE Protocol <a href="https://docs.skale.network/skale-chain/bite" target="_blank">docs.skale.network</a></h2>
+        <div class="doc-desc">Blockchain Intents with Threshold Encryption on SKALE.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> Optional middleware that encrypts premium API responses using threshold encryption. Only authorized agents with valid payment can decrypt the content.</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>Coinbase CDP SDK <a href="https://docs.cdp.coinbase.com/" target="_blank">docs.cdp.coinbase.com</a></h2>
+        <div class="doc-desc">Wallet infrastructure for creating and managing crypto wallets programmatically.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> The Agent SDK uses CDP for wallet creation and management, enabling agents to hold USDC and make payments to API providers.</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>USDC (Circle) <a href="https://www.circle.com/usdc" target="_blank">circle.com/usdc</a></h2>
+        <div class="doc-desc">Dollar-pegged stablecoin for predictable API pricing.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> All API payments are denominated and settled in USDC on Base L2. Prices are set per-route in USDC (e.g., $0.01 per request).</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>AP2 Protocol (Google) <a href="https://ap2-protocol.org/" target="_blank">ap2-protocol.org</a></h2>
+        <div class="doc-desc">Agent-to-Provider spending mandates with cryptographic authorization.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> Agents submit EIP-191 signed mandates that authorize spending limits, tool allowlists, and daily budgets. The gateway verifies mandate signatures, checks tool permissions, and enforces budget caps before proxying requests. Mandates enable delegated spending without exposing private keys.</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>OpenAPI 3.0 <a href="https://swagger.io/specification/" target="_blank">swagger.io/specification</a></h2>
+        <div class="doc-desc">Industry-standard API specification format.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> Routes are imported from OpenAPI specs and exported as OpenAPI specs. The gateway auto-generates documentation with x402 payment extensions.</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>viem <a href="https://viem.sh/" target="_blank">viem.sh</a></h2>
+        <div class="doc-desc">TypeScript interface for Ethereum with first-class type safety.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> Used for EIP-191 personal signing of AP2 mandates, address verification, keccak256 hashing, and JSON-RPC calls to both Base and SKALE networks.</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>Express.js <a href="https://expressjs.com/" target="_blank">expressjs.com</a></h2>
+        <div class="doc-desc">Minimal Node.js web framework for building APIs.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> Powers the gateway server with a middleware pipeline: route matching, idempotency, mandate verification, payment, BITE encryption, proxy, and receipt generation.</div>
+      </div>
+
+      <div class="doc-card">
+        <h2>Hardhat <a href="https://hardhat.org/" target="_blank">hardhat.org</a></h2>
+        <div class="doc-desc">Ethereum development environment for compiling, testing, and deploying Solidity contracts.</div>
+        <div class="doc-usage"><strong>How we use it:</strong> Used to compile and deploy the BITE encryption contract to SKALE. Handles contract verification and deployment scripts.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Shared sidebar logic (mirrors dashboard.html) ────────────────────
+let adminKey = localStorage.getItem('rt-admin-key') || '';
+let dashboardConfig = null;
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (adminKey) headers['x-admin-key'] = adminKey;
+  return fetch('/gateway' + path, { ...opts, headers: { ...headers, ...opts.headers } });
+}
+
+async function refreshHealth() {
+  const dot = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-label');
+  try {
+    const r = await api('/admin/health');
+    if (!r.ok) throw new Error(r.statusText);
+    const d = await r.json();
+    dot.className = 'conn-dot online';
+    label.textContent = 'x402 API Gateway';
+    document.getElementById('conn-status').textContent = 'Online';
+    document.getElementById('conn-status').style.color = 'var(--green)';
+    document.getElementById('conn-uptime').textContent = d.uptime_human || '-';
+    document.getElementById('conn-routes').textContent = d.route_count;
+    document.getElementById('conn-receipts').textContent = d.receipt_count;
+    const gwUrl = localStorage.getItem('rt-gateway-url') || 'http://localhost:4402';
+    const endpointEl = document.getElementById('conn-endpoint');
+    endpointEl.textContent = gwUrl;
+    endpointEl.href = gwUrl + '/health';
+    const docsEl = document.getElementById('conn-docs');
+    docsEl.textContent = gwUrl + '/docs';
+    docsEl.href = gwUrl + '/docs';
+    document.getElementById('conn-endpoint-row').style.display = '';
+    document.getElementById('conn-docs-row').style.display = '';
+  } catch {
+    dot.className = 'conn-dot offline';
+    label.textContent = 'x402 API Gateway';
+    document.getElementById('conn-status').textContent = 'Unreachable';
+    document.getElementById('conn-status').style.color = 'var(--red)';
+    document.getElementById('conn-uptime').textContent = '-';
+    document.getElementById('conn-routes').textContent = '-';
+    document.getElementById('conn-receipts').textContent = '-';
+    document.getElementById('conn-endpoint-row').style.display = 'none';
+    document.getElementById('conn-docs-row').style.display = 'none';
+  }
+}
+
+async function refreshStats() {
+  try {
+    const r = await api('/admin/receipts/stats');
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('stat-usdc').textContent = parseFloat(d.total_usdc_spent).toFixed(2);
+  } catch {}
+}
+
+async function loadDashboardConfig() {
+  try {
+    const r = await api('/admin/dashboard-config');
+    if (!r.ok) return;
+    dashboardConfig = await r.json();
+    document.getElementById('input-wallet-address').value = dashboardConfig.payToAddress || '';
+    document.getElementById('input-base-network').value = dashboardConfig.baseNetwork || 'base-sepolia';
+    document.getElementById('input-skale-network').value = dashboardConfig.skaleNetwork || 'staging-v3';
+    document.getElementById('input-skale-rpc').value = dashboardConfig.skaleRpcUrl || '';
+    document.getElementById('input-skale-contract').value = dashboardConfig.skaleBiteContract || '';
+    document.getElementById('input-api-key').value = dashboardConfig.apiKey || '';
+    updateNetworkLabels();
+  } catch {}
+}
+
+function updateNetworkLabels() {
+  const baseNet = document.getElementById('input-base-network').value;
+  const skaleNet = document.getElementById('input-skale-network').value;
+  const baseLabel = document.getElementById('label-base');
+  const skaleLabel = document.getElementById('label-skale');
+  const baseIsMainnet = baseNet === 'base';
+  const skaleIsMainnet = skaleNet === 'mainnet' || skaleNet === 'base-mainnet';
+  const baseName = baseIsMainnet ? 'BASE MAINNET' : 'BASE TESTNET';
+  const skaleName = skaleIsMainnet ? 'SKALE MAINNET' : 'SKALE TESTNET';
+  const baseConnected = localStorage.getItem('rt-base-connected') === baseNet;
+  const skaleConnected = localStorage.getItem('rt-skale-connected') === skaleNet + '|' + document.getElementById('input-skale-rpc').value;
+  baseLabel.textContent = baseName + (baseConnected ? ' \u2713' : '');
+  baseLabel.className = 'network-label ' + (baseConnected ? 'connected' : (baseIsMainnet ? 'mainnet' : 'testnet'));
+  skaleLabel.textContent = skaleName + (skaleConnected ? ' \u2713' : '');
+  skaleLabel.className = 'network-label ' + (skaleConnected ? 'connected' : (skaleIsMainnet ? 'mainnet' : 'testnet'));
+  // Update sidebar platform connections
+  const platBase = document.getElementById('plat-base');
+  const platSkale = document.getElementById('plat-skale');
+  const platCdp = document.getElementById('plat-cdp');
+  const platDot = document.getElementById('platform-dot');
+  if (platBase) {
+    platBase.textContent = baseConnected ? baseName + ' \u2713' : 'Not connected';
+    platBase.style.color = baseConnected ? 'var(--green)' : 'var(--muted)';
+  }
+  if (platSkale) {
+    platSkale.textContent = skaleConnected ? skaleName + ' \u2713' : 'Not connected';
+    platSkale.style.color = skaleConnected ? 'var(--green)' : 'var(--muted)';
+    if (skaleConnected && skaleIsMainnet) {
+      fetchSkaleBalance().then(bal => {
+        if (bal !== null) {
+          skaleLabel.innerHTML = skaleName + '<br>' + bal + ' CREDITS \u2713';
+          if (platSkale) platSkale.innerHTML = skaleName + '<br>' + bal + ' CREDITS \u2713';
+        }
+      });
+    }
+  }
+  if (platCdp) {
+    const cdpConfigured = dashboardConfig && dashboardConfig.cdpApiKeyId;
+    platCdp.textContent = cdpConfigured ? 'Configured' : 'Not configured';
+    platCdp.style.color = cdpConfigured ? 'var(--green)' : 'var(--muted)';
+  }
+  if (platDot) {
+    const anyConnected = baseConnected || skaleConnected;
+    platDot.className = 'conn-dot ' + (anyConnected ? 'online' : 'loading');
+  }
+}
+
+async function fetchSkaleBalance() {
+  try {
+    const r = await api('/admin/skale/status');
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.balanceFormatted || null;
+  } catch { return null; }
+}
+
+function toggleSettings() {
+  document.getElementById('settings-dropdown').classList.toggle('open');
+}
+function switchSettingsTab(id) {
+  document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.settings-tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.settings-tab[onclick*="'${id}'"]`).classList.add('active');
+  document.getElementById('stab-' + id).classList.add('active');
+}
+document.addEventListener('click', (e) => {
+  if (!document.querySelector('.settings-wrapper').contains(e.target)) {
+    document.getElementById('settings-dropdown').classList.remove('open');
+  }
+});
+
+async function testWallet() {
+  const el = document.getElementById('test-wallet-result');
+  const addr = document.getElementById('input-wallet-address').value.trim();
+  const network = document.getElementById('input-base-network').value;
+  if (!addr) { el.textContent = 'Enter a wallet address first'; el.style.color = 'var(--red)'; return; }
+  if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) { el.textContent = 'Invalid address format'; el.style.color = 'var(--red)'; return; }
+  const explorerBase = network === 'base' ? 'https://basescan.org' : 'https://sepolia.basescan.org';
+  el.innerHTML = `Valid address on ${network === 'base' ? 'Base Mainnet' : 'Base Testnet'} &mdash; <a style="color:var(--accent)" href="${explorerBase}/address/${addr}" target="_blank">View on Explorer</a>`;
+  el.style.color = 'var(--green)';
+  localStorage.setItem('rt-base-connected', network);
+  updateNetworkLabels();
+}
+
+async function testSkale() {
+  const el = document.getElementById('test-skale-result');
+  const rpcUrl = document.getElementById('input-skale-rpc').value.trim();
+  if (!rpcUrl) { el.textContent = 'Enter a SKALE RPC URL first'; el.style.color = 'var(--red)'; return; }
+  el.textContent = 'Checking...'; el.style.color = 'var(--muted)';
+  try {
+    const r = await fetch('/rpc-proxy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rpcUrl, body: { jsonrpc: '2.0', method: 'eth_chainId', params: [], id: 1 } }),
+    });
+    const d = await r.json();
+    if (d.result) {
+      el.innerHTML = 'Connected \u2014 Chain ID: ' + parseInt(d.result, 16);
+      el.style.color = 'var(--green)';
+      const skaleNet = document.getElementById('input-skale-network').value;
+      localStorage.setItem('rt-skale-connected', skaleNet + '|' + rpcUrl);
+      updateNetworkLabels();
+    } else { el.textContent = 'No chain ID returned'; el.style.color = 'var(--orange)'; }
+  } catch (e) { el.textContent = 'Failed: ' + e.message; el.style.color = 'var(--red)'; }
+}
+
+// ── Demo Presets ──
+const demoPresets = {
+  testnet: {
+    wallet: '0x1234567890abcdef1234567890abcdef12345678',
+    baseNetwork: 'base-sepolia',
+    skaleNetwork: 'calypso-testnet',
+    skaleRpc: 'https://base-sepolia-testnet.skalenodes.com/v1/base-testnet',
+    skaleContract: '0x64687C88C767D9a504c392C07393980af2879dC1',
+  },
+  mainnet: {
+    wallet: '0x5F80A88CbbeE1cd9905B89B45dd67c1225ace628',
+    baseNetwork: 'base',
+    skaleNetwork: 'base-mainnet',
+    skaleRpc: 'https://skale-base.skalenodes.com/v1/base',
+    skaleContract: '0x5237c33Ec0af68120B2dDEC5c668681d6F8ABD1E',
+  },
+};
+
+async function loadDemoPreset(network) {
+  const preset = demoPresets[network] || demoPresets.testnet;
+  document.getElementById('input-wallet-address').value = preset.wallet;
+  document.getElementById('input-base-network').value = preset.baseNetwork;
+  document.getElementById('input-skale-network').value = preset.skaleNetwork;
+  document.getElementById('input-skale-rpc').value = preset.skaleRpc;
+  document.getElementById('input-skale-contract').value = preset.skaleContract;
+  localStorage.setItem('rt-base-connected', preset.baseNetwork);
+  localStorage.setItem('rt-skale-connected', preset.skaleNetwork + '|' + preset.skaleRpc);
+  updateNetworkLabels();
+}
+
+// ── API Docs ─────────────────────────────────────────────────────────
+let cachedSpec = null;
+
+async function refreshApiDocs() {
+  const container = document.getElementById('api-docs-routes');
+  const titleEl = document.getElementById('api-docs-title');
+  const descEl = document.getElementById('api-docs-desc');
+  const linkEl = document.getElementById('api-docs-link');
+  container.innerHTML = '<div class="no-routes-msg">Loading...</div>';
+
+  try {
+    const r = await api('/admin/docs/openapi');
+    if (!r.ok) {
+      container.innerHTML = '<div class="no-routes-msg">Failed to load API docs (gateway unreachable)</div>';
+      return;
+    }
+    cachedSpec = await r.json();
+    renderApiDocs(cachedSpec, container, titleEl, descEl, linkEl);
+  } catch {
+    container.innerHTML = '<div class="no-routes-msg">Failed to load API docs</div>';
+  }
+}
+
+function renderApiDocs(spec, container, titleEl, descEl, linkEl) {
+  const info = spec.info || {};
+  titleEl.textContent = info.title || 'API Documentation';
+  descEl.textContent = info.description || '';
+
+  const gwUrl = localStorage.getItem('rt-gateway-url') || 'http://localhost:4402';
+  linkEl.innerHTML = 'OpenAPI Spec: <a href="' + gwUrl + '/docs" target="_blank">' + gwUrl + '/docs</a>';
+
+  const paths = spec.paths || {};
+  const entries = [];
+  for (const [path, methods] of Object.entries(paths)) {
+    for (const [method, op] of Object.entries(methods)) {
+      entries.push({ path, method: method.toUpperCase(), op });
+    }
+  }
+
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="no-routes-msg">No routes configured. Add routes in the <a href="/routes" style="color:var(--accent)">Routes</a> tab.</div>';
+    return;
+  }
+
+  // Group by tag
+  const byTag = {};
+  for (const e of entries) {
+    const tag = (e.op.tags && e.op.tags[0]) || 'Ungrouped';
+    if (!byTag[tag]) byTag[tag] = [];
+    byTag[tag].push(e);
+  }
+
+  let html = '';
+  for (const [tag, routes] of Object.entries(byTag)) {
+    if (Object.keys(byTag).length > 1 || tag !== 'Ungrouped') {
+      const tagMeta = (spec.tags || []).find(t => t.name === tag);
+      html += '<div style="margin-top:20px;margin-bottom:10px">';
+      html += '<span style="font-size:14px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">' + esc(tag) + '</span>';
+      if (tagMeta && tagMeta.description) {
+        html += ' <span style="font-size:12px;color:var(--muted);margin-left:8px">' + esc(tagMeta.description) + '</span>';
+      }
+      html += '</div>';
+    }
+
+    for (const { path, method, op } of routes) {
+      const price = op['x-routefi-price'] || '—';
+      const toolId = op['x-routefi-tool-id'] || op.operationId || '';
+      html += '<div class="doc-card" style="border-left-color:' + methodColor(method) + '">';
+      html += '<h2 style="gap:8px">';
+      html += '<span class="method-badge ' + method.toLowerCase() + '">' + method + '</span>';
+      html += '<span class="route-path">' + esc(path) + '</span>';
+      html += '</h2>';
+      if (op.summary) {
+        html += '<div class="doc-desc">' + esc(op.summary) + '</div>';
+      }
+      html += '<div class="route-meta">';
+      html += '<span class="route-price">' + esc(price) + ' USDC</span>';
+      if (toolId) html += '<span class="route-tag">tool: ' + esc(toolId) + '</span>';
+      html += '</div>';
+
+      // Parameters
+      if (op.parameters && op.parameters.length > 0) {
+        html += '<div style="margin-top:10px;font-size:12px;color:var(--muted)">';
+        html += '<strong style="color:var(--text)">Parameters:</strong> ';
+        html += op.parameters.map(p => '<code style="color:var(--accent);background:var(--bg);padding:1px 6px;border-radius:3px">' + esc(p.name) + '</code> (' + esc(p.in) + ')').join(', ');
+        html += '</div>';
+      }
+
+      // Responses
+      if (op.responses) {
+        html += '<div style="margin-top:8px;font-size:12px;color:var(--muted)">';
+        html += '<strong style="color:var(--text)">Responses:</strong> ';
+        html += Object.entries(op.responses).map(([code, r]) => {
+          const color = code.startsWith('2') ? 'var(--green)' : code === '402' ? 'var(--orange)' : 'var(--red)';
+          return '<span style="color:' + color + '">' + code + '</span> ' + esc(r.description || '');
+        }).join(' &middot; ');
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+  }
+
+  container.innerHTML = html;
+}
+
+function methodColor(m) {
+  const colors = { GET: '#238636', POST: '#1a6eff', PUT: '#d29922', DELETE: '#f85149', PATCH: '#bc8cff' };
+  return colors[m] || 'var(--accent)';
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function copyOpenApiUrl() {
+  const gwUrl = localStorage.getItem('rt-gateway-url') || 'http://localhost:4402';
+  navigator.clipboard.writeText(gwUrl + '/docs').then(() => {
+    const btn = document.querySelector('.api-docs-actions button');
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+function downloadOpenApi() {
+  if (!cachedSpec) { refreshApiDocs(); return; }
+  const blob = new Blob([JSON.stringify(cachedSpec, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const title = (cachedSpec.info && cachedSpec.info.title) || 'api';
+  a.download = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '') + '-openapi.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Init ──
+(function init() {
+  updateNetworkLabels();
+  loadDashboardConfig();
+  refreshHealth();
+  refreshStats();
+  refreshApiDocs();
+  setInterval(() => { refreshHealth(); refreshStats(); }, 10000);
+})();
+</script>
+</body>
+</html>

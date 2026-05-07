@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Routefi — Live Demo</title>
+  <link rel="icon" href="/favicon.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand: #3b82f6;
+      --brand-dim: #2563eb;
+      --bg: #050505;
+      --nav-bg: #0a0a0a;
+      --card: rgba(255,255,255,0.02);
+      --border: rgba(148,163,184,0.12);
+      --text: #f1f5f9;
+      --muted: rgba(255,255,255,0.4);
+      --muted2: rgba(255,255,255,0.25);
+      --muted3: rgba(255,255,255,0.15);
+      --r: 10px;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
+    .mono { font-family: 'Space Mono', 'JetBrains Mono', monospace; }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10,10,10,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border); height: 52px;
+      display: flex; align-items: center; padding: 0 1.5rem; gap: 1rem;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
+    .nav-logo img { height: 24px; }
+    .nav-logo-text { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+    .nav-sep { color: var(--muted3); font-size: 0.8rem; }
+    .nav-title { font-size: 0.75rem; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.1em; }
+    .nav-right { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+    .nav-btn {
+      font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;
+      padding: 0.3rem 0.75rem; border-radius: 5px; cursor: pointer; text-decoration: none;
+      transition: all 0.15s;
+    }
+    .nav-ghost { border: 1px solid var(--border); color: var(--muted2); background: transparent; }
+    .nav-ghost:hover { border-color: var(--brand); color: var(--brand); }
+    .nav-brand { background: var(--brand); color: #000; border: 1px solid var(--brand); }
+    .nav-brand:hover { background: var(--brand-dim); }
+
+    /* LAYOUT */
+    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; padding-top: 52px; }
+
+    /* SIDEBAR */
+    .sidebar {
+      border-right: 1px solid var(--border); padding: 1.5rem 0;
+      position: sticky; top: 52px; height: calc(100vh - 52px);
+      overflow-y: auto; background: var(--nav-bg);
+    }
+    .sidebar-label {
+      font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.25em;
+      color: var(--muted3); padding: 0 1.25rem; margin-bottom: 0.75rem;
+    }
+    .act-link {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.6rem 1.25rem; text-decoration: none; cursor: pointer;
+      transition: all 0.15s; border-left: 2px solid transparent;
+    }
+    .act-link:hover { background: rgba(255,255,255,0.03); border-left-color: var(--muted3); }
+    .act-link.active { background: rgba(59,130,246,0.06); border-left-color: var(--brand); }
+    .act-num {
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      border: 1px solid var(--border); background: rgba(255,255,255,0.04);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 700; color: var(--muted2);
+      font-family: 'JetBrains Mono', monospace; transition: all 0.15s;
+    }
+    .act-link.active .act-num { border-color: var(--brand); color: var(--brand); background: rgba(59,130,246,0.1); }
+    .act-link.done .act-num { border-color: #05df72; color: #05df72; background: rgba(5,223,114,0.1); }
+    .act-link.done .act-num::after { content: '✓'; }
+    .act-info { flex: 1; }
+    .act-name { font-size: 0.72rem; font-weight: 600; color: var(--muted2); transition: color 0.15s; }
+    .act-link.active .act-name { color: var(--text); }
+    .act-link.done .act-name { color: var(--muted2); }
+    .act-desc { font-size: 0.6rem; color: var(--muted3); margin-top: 0.15rem; }
+    .sidebar-progress { padding: 1.25rem; margin-top: 1rem; border-top: 1px solid var(--border); }
+    .progress-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--muted3); margin-bottom: 0.5rem; }
+    .progress-bar { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--brand); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
+    .progress-text { font-size: 0.6rem; color: var(--muted3); margin-top: 0.4rem; font-family: 'JetBrains Mono', monospace; }
+
+    /* CONTENT */
+    .content { padding: 2rem; max-width: 860px; }
+
+    /* ACT SECTION */
+    .act-section { display: none; }
+    .act-section.visible { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .act-header { margin-bottom: 1.75rem; }
+    .act-badge {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.2em;
+      color: var(--brand); border: 1px solid rgba(59,130,246,0.25);
+      background: rgba(59,130,246,0.06); padding: 0.25rem 0.6rem; border-radius: 4px;
+      margin-bottom: 0.75rem; font-family: 'JetBrains Mono', monospace;
+    }
+    .act-title { font-size: 1.75rem; font-weight: 800; line-height: 1.2; margin-bottom: 0.6rem; }
+    .act-subtitle { font-size: 0.9rem; color: var(--muted); line-height: 1.65; max-width: 600px; }
+
+    /* Cards */
+    .card {
+      border: 1px solid var(--border); border-radius: var(--r);
+      background: var(--card); padding: 1.5rem; margin-bottom: 1rem;
+    }
+    .card-title {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--muted2); margin-bottom: 1rem;
+    }
+
+    /* Terminal */
+    .terminal {
+      border: 1px solid var(--border); border-radius: var(--r); overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .terminal-bar {
+      background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border);
+      padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .t-dot { width: 9px; height: 9px; border-radius: 50%; }
+    .t-r { background: #ff5f57; } .t-y { background: #febc2e; } .t-g { background: #28c840; }
+    .t-lbl { margin-left: auto; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted3); font-family: 'JetBrains Mono', monospace; }
+    .terminal-body { padding: 1.25rem 1.5rem; font-family: 'Space Mono', monospace; font-size: 0.72rem; line-height: 1.85; }
+    .t-cmd { color: var(--brand); }
+    .t-out { color: rgba(255,255,255,0.6); }
+    .t-comment { color: rgba(255,255,255,0.25); }
+    .t-green { color: #05df72; } .t-yellow { color: #f0d000; } .t-blue { color: #6aaeff; }
+    .t-red { color: #ff6568; } .t-brand { color: var(--brand); }
+    .t-key { color: #6aaeff; } .t-val { color: #f0d000; } .t-str { color: #05df72; }
+
+    /* Step list */
+    .steps { display: flex; flex-direction: column; gap: 0.75rem; }
+    .step {
+      display: flex; gap: 1rem; align-items: flex-start;
+      padding: 1rem; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--card);
+    }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      border: 1px solid rgba(59,130,246,0.3); background: rgba(59,130,246,0.07);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: var(--brand);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .step-text { font-size: 0.77rem; color: var(--muted); line-height: 1.6; }
+
+    /* Code block */
+    .code-block {
+      background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 7px;
+      padding: 1rem 1.25rem; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+      color: rgba(255,255,255,0.7); line-height: 1.7; overflow-x: auto; margin-bottom: 1rem;
+      position: relative;
+    }
+    .copy-btn {
+      position: absolute; top: 0.5rem; right: 0.5rem;
+      font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em;
+      padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid var(--border);
+      background: rgba(255,255,255,0.05); color: var(--muted3); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { border-color: var(--brand); color: var(--brand); }
+
+    /* Info box */
+    .info-box {
+      border: 1px solid rgba(96,165,250,0.25); background: rgba(96,165,250,0.05);
+      border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+      font-size: 0.78rem; color: rgba(255,255,255,0.55); line-height: 1.65;
+    }
+    .info-box strong { color: #6aaeff; }
+    .warn-box {
+      border: 1px solid rgba(240,208,0,0.25); background: rgba(240,208,0,0.05);
+      border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+      font-size: 0.78rem; color: rgba(255,255,255,0.55); line-height: 1.65;
+    }
+    .warn-box strong { color: #f0d000; }
+    .success-box {
+      border: 1px solid rgba(5,223,114,0.25); background: rgba(5,223,114,0.05);
+      border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+      font-size: 0.78rem; color: rgba(255,255,255,0.55); line-height: 1.65;
+    }
+    .success-box strong { color: #05df72; }
+
+    /* Live demo button */
+    .live-demo-btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.65rem 1.25rem; border-radius: 7px; font-size: 0.78rem;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+      cursor: pointer; text-decoration: none; transition: all 0.15s; border: none;
+    }
+    .btn-green { background: var(--brand); color: #000; }
+    .btn-green:hover { background: var(--brand-dim); }
+    .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-outline:hover { border-color: var(--brand); color: var(--brand); }
+
+    /* Receipt card */
+    .receipt-card {
+      border: 1px solid rgba(59,130,246,0.2); border-radius: var(--r);
+      background: rgba(59,130,246,0.03); padding: 1.25rem; font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem; line-height: 1.85;
+    }
+    .r-row { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 0.2rem 0; }
+    .r-row:last-child { border-bottom: none; }
+    .r-key { color: var(--muted3); }
+    .r-val { color: rgba(255,255,255,0.7); text-align: right; }
+    .r-val.green { color: #05df72; }
+    .r-val.brand { color: var(--brand); }
+
+    /* Stat grid */
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+    .stat-card {
+      border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+      padding: 1rem; text-align: center;
+    }
+    .stat-val { font-size: 1.5rem; font-weight: 800; color: var(--brand); font-family: 'JetBrains Mono', monospace; }
+    .stat-lbl { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted3); margin-top: 0.25rem; }
+
+    /* Navigation buttons */
+    .act-nav { display: flex; gap: 0.75rem; align-items: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+    .act-nav-prev, .act-nav-next { padding: 0.55rem 1.1rem; border-radius: 7px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; transition: all 0.15s; border: 1px solid var(--border); background: transparent; color: var(--muted2); }
+    .act-nav-prev:hover { border-color: var(--brand); color: var(--brand); }
+    .act-nav-next { background: var(--brand); border-color: var(--brand); color: #000; margin-left: auto; }
+    .act-nav-next:hover { background: var(--brand-dim); }
+    .act-nav-next:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Live indicator */
+    .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #05df72; box-shadow: 0 0 7px #05df72; animation: blink 2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* iframe viewer */
+    .iframe-wrap {
+      border: 1px solid var(--border); border-radius: var(--r); overflow: hidden;
+      height: 420px; position: relative;
+    }
+    .iframe-wrap iframe { width: 100%; height: 100%; border: none; background: var(--bg); }
+    .iframe-label {
+      position: absolute; top: 0.5rem; right: 0.5rem; z-index: 2;
+      font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em;
+      background: rgba(0,0,0,0.7); border: 1px solid var(--border); border-radius: 4px;
+      padding: 0.2rem 0.5rem; color: var(--muted3); font-family: 'JetBrains Mono', monospace;
+    }
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .stat-grid { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/landing" class="nav-logo">
+    <img src="/routefi-icon.png" alt="Routefi" style="height:36px;width:36px;object-fit:contain;" />
+    <img src="/routefi-name.png" alt="Routefi" style="height:18px;width:auto;object-fit:contain;margin-left:4px;" />
+  </a>
+  <span class="nav-sep">/</span>
+  <span class="nav-title">Live Demo</span>
+  <div class="nav-right">
+    <a href="/landing" class="nav-btn nav-ghost">← Home</a>
+    <a href="/dashboard" class="nav-btn nav-ghost">Dashboard</a>
+    <a href="/docs" class="nav-btn nav-brand">Docs</a>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <p class="sidebar-label">Demo Flow</p>
+    <a class="act-link active" data-act="1" onclick="showAct(1)">
+      <div class="act-num">1</div>
+      <div class="act-info">
+        <div class="act-name">Provider Dashboard</div>
+        <div class="act-desc">Routes &amp; pricing</div>
+      </div>
+    </a>
+    <a class="act-link" data-act="2" onclick="showAct(2)">
+      <div class="act-num">2</div>
+      <div class="act-info">
+        <div class="act-name">402 Without Payment</div>
+        <div class="act-desc">The gatekeeping</div>
+      </div>
+    </a>
+    <a class="act-link" data-act="3" onclick="showAct(3)">
+      <div class="act-num">3</div>
+      <div class="act-info">
+        <div class="act-name">Fund Agent Wallet</div>
+        <div class="act-desc">Test USDC on Base Sepolia</div>
+      </div>
+    </a>
+    <a class="act-link" data-act="4" onclick="showAct(4)">
+      <div class="act-num">4</div>
+      <div class="act-info">
+        <div class="act-name">Agent Pays &amp; Gets Data</div>
+        <div class="act-desc">Autonomous payment</div>
+      </div>
+    </a>
+    <a class="act-link" data-act="5" onclick="showAct(5)">
+      <div class="act-num">5</div>
+      <div class="act-info">
+        <div class="act-name">Receipts &amp; Proof</div>
+        <div class="act-desc">On-chain audit trail</div>
+      </div>
+    </a>
+    <div class="sidebar-progress">
+      <p class="progress-label">Progress</p>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <p class="progress-text" id="progress-text">Act 1 / 5</p>
+    </div>
+  </aside>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- ─── ACT 1 ─────────────────────────────────────────── -->
+    <div id="act1" class="act-section visible">
+      <div class="act-header">
+        <div class="act-badge"><span class="live-dot"></span> &nbsp;Act 1 of 5</div>
+        <h1 class="act-title">Provider Dashboard</h1>
+        <p class="act-subtitle">
+          As an API provider, you configure routes and pricing in the dashboard. The gateway enforces payment on every request — no changes to your upstream API needed.
+        </p>
+      </div>
+
+      <div class="info-box">
+        <strong>📍 What to show:</strong> Open the live dashboard and walk through the 3 registered routes, their prices, and the pay-to wallet address. Zero receipts yet — the agent hasn't paid anything.
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-val">3</div><div class="stat-lbl">Routes Active</div></div>
+        <div class="stat-card"><div class="stat-val">$0.001</div><div class="stat-lbl">Price per Request</div></div>
+        <div class="stat-card"><div class="stat-val">0</div><div class="stat-lbl">Receipts So Far</div></div>
+      </div>
+
+      <p class="card-title" style="margin-bottom:0.5rem;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2);">Registered Routes</p>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:0.72rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02);">
+              <th style="padding:0.6rem 1rem;text-align:left;color:var(--muted3);font-weight:600;text-transform:uppercase;letter-spacing:0.1em;font-size:0.6rem;">Method</th>
+              <th style="padding:0.6rem 1rem;text-align:left;color:var(--muted3);font-weight:600;text-transform:uppercase;letter-spacing:0.1em;font-size:0.6rem;">Path</th>
+              <th style="padding:0.6rem 1rem;text-align:left;color:var(--muted3);font-weight:600;text-transform:uppercase;letter-spacing:0.1em;font-size:0.6rem;">Tool ID</th>
+              <th style="padding:0.6rem 1rem;text-align:right;color:var(--muted3);font-weight:600;text-transform:uppercase;letter-spacing:0.1em;font-size:0.6rem;">Price</th>
+            </tr>
+          </thead>
+          <tbody id="routes-table-body">
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+              <td style="padding:0.65rem 1rem;"><span style="background:rgba(59,130,246,0.1);color:var(--brand);padding:0.15rem 0.4rem;border-radius:3px;font-size:0.65rem;">GET</span></td>
+              <td style="padding:0.65rem 1rem;color:rgba(255,255,255,0.6);">/api/v1/posts</td>
+              <td style="padding:0.65rem 1rem;color:var(--muted2);">list-posts</td>
+              <td style="padding:0.65rem 1rem;text-align:right;color:var(--brand);">$0.001</td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+              <td style="padding:0.65rem 1rem;"><span style="background:rgba(59,130,246,0.1);color:var(--brand);padding:0.15rem 0.4rem;border-radius:3px;font-size:0.65rem;">GET</span></td>
+              <td style="padding:0.65rem 1rem;color:rgba(255,255,255,0.6);">/api/v1/posts/:id</td>
+              <td style="padding:0.65rem 1rem;color:var(--muted2);">get-post</td>
+              <td style="padding:0.65rem 1rem;text-align:right;color:var(--brand);">$0.001</td>
+            </tr>
+            <tr>
+              <td style="padding:0.65rem 1rem;"><span style="background:rgba(59,130,246,0.1);color:var(--brand);padding:0.15rem 0.4rem;border-radius:3px;font-size:0.65rem;">GET</span></td>
+              <td style="padding:0.65rem 1rem;color:rgba(255,255,255,0.6);">/api/v1/users</td>
+              <td style="padding:0.65rem 1rem;color:var(--muted2);">list-users</td>
+              <td style="padding:0.65rem 1rem;text-align:right;color:var(--brand);">$0.001</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="card-title" style="margin-bottom:0.5rem;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2);">Live Dashboard</p>
+      <div class="iframe-wrap">
+        <span class="iframe-label">localhost:3000</span>
+        <iframe src="/dashboard" title="Routefi Dashboard"></iframe>
+      </div>
+
+      <div class="act-nav">
+        <span style="font-size:0.72rem;color:var(--muted3);">Start here — show the provider's view</span>
+        <button class="act-nav-next" onclick="showAct(2)">Next: 402 Without Payment →</button>
+      </div>
+    </div>
+
+    <!-- ─── ACT 2 ─────────────────────────────────────────── -->
+    <div id="act2" class="act-section">
+      <div class="act-header">
+        <div class="act-badge"><span class="live-dot"></span> &nbsp;Act 2 of 5</div>
+        <h1 class="act-title">402 Without Payment</h1>
+        <p class="act-subtitle">
+          Hit the gateway without a payment header. You get a <strong style="color:#f0d000">402 Payment Required</strong> — like HTTP 401 but for money. The gateway enforces payment before proxying.
+        </p>
+      </div>
+
+      <div class="warn-box">
+        <strong>🎯 The point:</strong> Without payment, agents are blocked. The response tells the agent exactly how much to pay, on which network, and to which address — all machine-readable.
+      </div>
+
+      <p class="card-title" style="margin-bottom:0.5rem;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2);">Run this in your terminal</p>
+      <div class="code-block" style="position:relative">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <span style="color:var(--brand)">$</span> curl -s http://localhost:4402/api/v1/posts | python3 -m json.tool
+      </div>
+
+      <p class="card-title" style="margin-bottom:0.5rem;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2);">Expected Response — HTTP 402</p>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="t-dot t-r"></span><span class="t-dot t-y"></span><span class="t-dot t-g"></span>
+          <span class="t-lbl">Gateway Response</span>
+        </div>
+        <div class="terminal-body">
+<span class="t-yellow">HTTP/1.1 402 Payment Required</span>
+<span class="t-out">Content-Type: application/json</span>
+<br/>
+<span class="t-out">{</span>
+<span class="t-out">&nbsp;&nbsp;<span class="t-key">"x402Version"</span>: <span class="t-val">1</span>,</span>
+<span class="t-out">&nbsp;&nbsp;<span class="t-key">"accepts"</span>: [</span>
+<span class="t-out">&nbsp;&nbsp;&nbsp;&nbsp;{</span>
+<span class="t-out">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-key">"scheme"</span>: <span class="t-str">"exact"</span>,</span>
+<span class="t-out">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-key">"network"</span>: <span class="t-str">"eip155:84532"</span>,</span>
+<span class="t-out">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-key">"maxAmountRequired"</span>: <span class="t-str">"1000"</span>,</span>
+<span class="t-out">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-key">"payTo"</span>: <span class="t-str">"0x3E05...C1a8"</span>,</span>
+<span class="t-out">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-key">"asset"</span>: <span class="t-str">"0x036Cbd...USDC"</span></span>
+<span class="t-out">&nbsp;&nbsp;&nbsp;&nbsp;}</span>
+<span class="t-out">&nbsp;&nbsp;],</span>
+<span class="t-out">&nbsp;&nbsp;<span class="t-key">"error"</span>: <span class="t-str">"Payment required"</span></span>
+<span class="t-out">}</span>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <strong>💡 Key insight:</strong> The 402 response is fully machine-readable. An AI agent reads <code>maxAmountRequired</code>, <code>payTo</code>, and <code>network</code> — then signs and sends the payment automatically. No human needed.
+      </div>
+
+      <div class="act-nav">
+        <button class="act-nav-prev" onclick="showAct(1)">← Back</button>
+        <button class="act-nav-next" onclick="showAct(3)">Next: Fund Agent Wallet →</button>
+      </div>
+    </div>
+
+    <!-- ─── ACT 3 ─────────────────────────────────────────── -->
+    <div id="act3" class="act-section">
+      <div class="act-header">
+        <div class="act-badge"><span class="live-dot"></span> &nbsp;Act 3 of 5</div>
+        <h1 class="act-title">Fund the Agent Wallet</h1>
+        <p class="act-subtitle">
+          The SDK creates a fresh CDP wallet on <code style="color:var(--brand)">init()</code>. Fund it with test USDC on Base Sepolia so the agent can pay for requests autonomously.
+        </p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Run the agent to get its wallet address</div>
+            <div class="step-text">The agent creates a new CDP wallet each time. Run it once — it will print the wallet address before failing (no funds yet).</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Copy the agent wallet address from the output</div>
+            <div class="step-text">Look for a line like: <code style="color:var(--brand);font-size:0.8rem">Agent wallet: 0xAbCd...1234</code></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Get test USDC from Circle Faucet</div>
+            <div class="step-text">Go to <a href="https://faucet.circle.com" target="_blank" style="color:var(--brand)">faucet.circle.com</a> → select <strong>Base Sepolia</strong> → paste the agent wallet address → request USDC.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Wait ~30 seconds for funds to arrive</div>
+            <div class="step-text">Base Sepolia is fast. You can check the balance on <a href="https://sepolia.basescan.org" target="_blank" style="color:var(--brand)">sepolia.basescan.org</a> by searching the agent address.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:1rem;">
+        <p class="card-title" style="margin-bottom:0.5rem;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2);">Agent init — what the SDK does</p>
+        <div class="terminal">
+          <div class="terminal-bar">
+            <span class="t-dot t-r"></span><span class="t-dot t-y"></span><span class="t-dot t-g"></span>
+            <span class="t-lbl">examples/agent-demo/run.ts</span>
+          </div>
+          <div class="terminal-body">
+<span class="t-comment">// SDK creates a CDP wallet and wraps fetch with x402 auto-payment</span>
+<span class="t-out">const client = new <span class="t-brand">RoutefiClient</span>({ gatewayBaseUrl: <span class="t-str">"http://localhost:4402"</span> });</span>
+<br/>
+<span class="t-out">await client.<span class="t-brand">init</span>();</span>
+<span class="t-comment">// ↑ Creates CDP account, registers EVM payment scheme, wraps fetch</span>
+<br/>
+<span class="t-green">✓  Agent wallet: 0xAbCd...1234  ← fund this address</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="warn-box" style="margin-top:0.5rem;">
+        <strong>⚠️ Note:</strong> CDP creates a new wallet address each run. Fund the address from the current run's output. For a persistent wallet, you'd serialize and reuse the account — not needed for this demo.
+      </div>
+
+      <div class="act-nav">
+        <button class="act-nav-prev" onclick="showAct(2)">← Back</button>
+        <button class="act-nav-next" onclick="showAct(4)">Next: Agent Pays &amp; Gets Data →</button>
+      </div>
+    </div>
+
+    <!-- ─── ACT 4 ─────────────────────────────────────────── -->
+    <div id="act4" class="act-section">
+      <div class="act-header">
+        <div class="act-badge"><span class="live-dot"></span> &nbsp;Act 4 of 5</div>
+        <h1 class="act-title">Agent Pays &amp; Gets Data</h1>
+        <p class="act-subtitle">
+          The agent detects the 402, pays $0.001 USDC on Base Sepolia, and retries — all autonomously. No human involved after the wallet is funded.
+        </p>
+      </div>
+
+      <div class="success-box">
+        <strong>🎯 The magic moment:</strong> Click Run Demo to watch the agent intercept the 402, sign and broadcast the payment, then receive real data from the upstream API — in one uninterrupted flow.
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem;">
+        <p class="card-title" style="margin:0;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2);">Live agent terminal</p>
+        <button id="run-btn" onclick="runDemo()" style="
+          background: linear-gradient(135deg,#3b82f6,#7c3aed);
+          color: #fff;
+          border: none;
+          border-radius: 8px;
+          padding: 0.45rem 1.1rem;
+          font-size: 0.82rem;
+          font-weight: 600;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          transition: opacity 0.2s;
+        ">▶&nbsp; Run Demo</button>
+        <span id="demo-status" style="font-size:0.75rem;color:var(--muted2);"></span>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="t-dot t-r"></span><span class="t-dot t-y"></span><span class="t-dot t-g"></span>
+          <span class="t-lbl">Routefi Agent — Base Sepolia</span>
+          <span id="terminal-live-dot" class="live-dot" style="margin-left:0.5rem;display:none"></span>
+        </div>
+        <div class="terminal-body" id="demo-terminal" style="min-height:260px;max-height:420px;overflow-y:auto;">
+          <div style="color:var(--muted2);font-style:italic;">Click ▶ Run Demo to start the live agent…</div>
+        </div>
+      </div>
+
+      <div class="info-box" style="margin-top:1rem;">
+        <strong>💡 How the SDK works:</strong> The SDK intercepts any 402 response, reads the payment requirements, signs an EVM transaction via the CDP account, and retries the original request with the <code>X-Payment</code> header — all transparent to the calling code.
+      </div>
+
+      <div class="act-nav">
+        <button class="act-nav-prev" onclick="showAct(3)">← Back</button>
+        <button id="act4-next" class="act-nav-next" onclick="showAct(5)" style="display:none">Next: Receipts &amp; Proof →</button>
+      </div>
+    </div>
+
+    <script>
+    let demoSource = null;
+
+    function tagColor(tag) {
+      tag = tag.toUpperCase();
+      if (tag === 'INIT' || tag === 'WALLET') return '#60a5fa';
+      if (tag === '200 OK') return '#05df72';
+      if (tag === 'RECEIPT') return '#a78bfa';
+      if (tag === 'ERROR' || tag === 'ERR') return '#f87171';
+      if (tag === 'REQUEST') return '#e2e8f0';
+      if (tag === 'TOTAL' || tag === 'DONE') return '#34d399';
+      if (tag === '---') return '#64748b';
+      return '#94a3b8';
+    }
+
+    function appendLine(html) {
+      const t = document.getElementById('demo-terminal');
+      t.insertAdjacentHTML('beforeend', html);
+      t.scrollTop = t.scrollHeight;
+    }
+
+    function runDemo() {
+      if (demoSource) { demoSource.close(); demoSource = null; }
+
+      const btn = document.getElementById('run-btn');
+      const status = document.getElementById('demo-status');
+      const dot = document.getElementById('terminal-live-dot');
+      const next = document.getElementById('act4-next');
+
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.textContent = '⏳ Running…';
+      status.textContent = 'Connecting…';
+      dot.style.display = 'inline-block';
+      next.style.display = 'none';
+
+      document.getElementById('demo-terminal').innerHTML = '';
+
+      demoSource = new EventSource('/run-demo');
+
+      demoSource.addEventListener('log', (e) => {
+        const d = JSON.parse(e.data);
+        const color = tagColor(d.tag);
+        const tag = d.tag.padEnd(7);
+        const isComment = d.tag === '---';
+        if (isComment) {
+          appendLine(`<div style="color:#475569;margin:0.3rem 0;">── ${d.msg} ──</div>`);
+        } else {
+          appendLine(`<div><span style="color:${color};font-weight:600;">[${tag}]</span>  <span style="color:#e2e8f0;">${escHtml(d.msg)}</span></div>`);
+        }
+        status.textContent = 'Running…';
+      });
+
+      demoSource.addEventListener('done', (e) => {
+        const d = JSON.parse(e.data);
+        dot.style.display = 'none';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.textContent = '↺  Run Again';
+        if (d.success) {
+          status.textContent = '✓ Done';
+          status.style.color = '#05df72';
+          appendLine('<div style="margin-top:0.6rem;color:#05df72;font-weight:600;">✓ Demo complete — agent paid and received data successfully.</div>');
+          next.style.display = 'inline-flex';
+        } else {
+          status.textContent = '✗ Error (exit ' + d.code + ')';
+          status.style.color = '#f87171';
+          appendLine('<div style="margin-top:0.6rem;color:#f87171;">✗ Demo exited with code ' + d.code + '. Check gateway is running on port 4402.</div>');
+        }
+        demoSource.close();
+        demoSource = null;
+      });
+
+      demoSource.onerror = () => {
+        dot.style.display = 'none';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.textContent = '↺  Retry';
+        status.textContent = '✗ Connection lost';
+        status.style.color = '#f87171';
+        appendLine('<div style="color:#f87171;">Connection to server lost. Is the dashboard running?</div>');
+        demoSource.close();
+        demoSource = null;
+      };
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    </script>
+
+    <!-- ─── ACT 5 ─────────────────────────────────────────── -->
+    <div id="act5" class="act-section">
+      <div class="act-header">
+        <div class="act-badge"><span class="live-dot"></span> &nbsp;Act 5 of 5</div>
+        <h1 class="act-title">Receipts &amp; Proof</h1>
+        <p class="act-subtitle">
+          Every successful request generates a cryptographic receipt — stored on the gateway, returned to the agent, and verifiable on-chain. Both sides have proof.
+        </p>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-val" id="receipt-count">1</div><div class="stat-lbl">Receipts Generated</div></div>
+        <div class="stat-card"><div class="stat-val">$0.001</div><div class="stat-lbl">USDC Settled</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:#05df72">✓</div><div class="stat-lbl">On-Chain Proof</div></div>
+      </div>
+
+      <p class="card-title" style="margin-bottom:0.5rem;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2);">Sample Receipt — receipts.json</p>
+      <div class="receipt-card">
+        <div class="r-row"><span class="r-key">request_id</span><span class="r-val">req_7f3ea291-...</span></div>
+        <div class="r-row"><span class="r-key">tool_id</span><span class="r-val brand">list-posts</span></div>
+        <div class="r-row"><span class="r-key">provider_id</span><span class="r-val">jsonplaceholder</span></div>
+        <div class="r-row"><span class="r-key">endpoint</span><span class="r-val">/api/v1/posts</span></div>
+        <div class="r-row"><span class="r-key">method</span><span class="r-val">GET</span></div>
+        <div class="r-row"><span class="r-key">price_usdc</span><span class="r-val brand">0.001</span></div>
+        <div class="r-row"><span class="r-key">currency</span><span class="r-val">USDC</span></div>
+        <div class="r-row"><span class="r-key">chain</span><span class="r-val">base-sepolia</span></div>
+        <div class="r-row"><span class="r-key">payment_tx_hash</span><span class="r-val">0x7f3e...a291</span></div>
+        <div class="r-row"><span class="r-key">outcome</span><span class="r-val green">SUCCESS ✓</span></div>
+        <div class="r-row"><span class="r-key">timestamp</span><span class="r-val">2026-05-07T10:56:xx.xxxZ</span></div>
+        <div class="r-row"><span class="r-key">latency_ms</span><span class="r-val">312</span></div>
+      </div>
+
+      <p class="card-title" style="margin-bottom:0.5rem;margin-top:1rem;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2);">Check receipts in the dashboard</p>
+      <div class="iframe-wrap">
+        <span class="iframe-label">localhost:3000 — Requests tab</span>
+        <iframe src="/requests" title="Routefi Receipts"></iframe>
+      </div>
+
+      <div class="code-block" style="margin-top:1rem;position:relative">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <span style="color:var(--muted3)"># Fetch receipts directly from the admin API</span>
+<span style="color:var(--brand)">$</span> curl -s -H "Authorization: Bearer rt-admin-dev-key" \
+    http://localhost:4402/admin/receipts | python3 -m json.tool
+      </div>
+
+      <div class="success-box">
+        <strong>✅ The punchline:</strong> The agent called a real API, paid real (test) USDC autonomously, the provider received payment to their wallet, and both sides have a cryptographic receipt — <em>zero human involvement after setup.</em>
+      </div>
+
+      <div class="act-nav">
+        <button class="act-nav-prev" onclick="showAct(4)">← Back</button>
+        <a href="/landing" class="act-nav-next" style="text-decoration:none">🏠 &nbsp;Back to Home</a>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /layout -->
+
+<script>
+  let currentAct = 1;
+  const totalActs = 5;
+
+  function showAct(n) {
+    // Hide all
+    document.querySelectorAll('.act-section').forEach(el => el.classList.remove('visible'));
+    document.querySelectorAll('.act-link').forEach(el => el.classList.remove('active'));
+
+    // Show target
+    document.getElementById('act' + n).classList.add('visible');
+    document.querySelector('[data-act="' + n + '"]').classList.add('active');
+
+    // Mark previous as done
+    document.querySelectorAll('.act-link').forEach(el => {
+      const actNum = parseInt(el.getAttribute('data-act'));
+      if (actNum < n) el.classList.add('done');
+      else el.classList.remove('done');
+    });
+
+    // Update progress
+    const pct = Math.round((n / totalActs) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = 'Act ' + n + ' / ' + totalActs;
+
+    currentAct = n;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Update URL hash
+    history.pushState(null, '', '#act' + n);
+  }
+
+  function copyCode(btn) {
+    const block = btn.parentElement;
+    const text = block.innerText.replace('Copy', '').trim();
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.style.color = 'var(--brand)';
+      btn.style.borderColor = 'var(--brand)';
+      setTimeout(() => { btn.textContent = 'Copy'; btn.style.color = ''; btn.style.borderColor = ''; }, 1500);
+    });
+  }
+
+  // Load receipts count from gateway
+  async function loadReceiptCount() {
+    try {
+      const res = await fetch('/gateway/admin/receipts', { headers: { 'Authorization': 'Bearer rt-admin-dev-key' } });
+      if (res.ok) {
+        const data = await res.json();
+        const count = Array.isArray(data) ? data.length : (data.receipts?.length || 0);
+        document.getElementById('receipt-count').textContent = count;
+      }
+    } catch {}
+  }
+
+  // Check for hash on load
+  const hash = window.location.hash;
+  if (hash && hash.startsWith('#act')) {
+    const n = parseInt(hash.replace('#act', ''));
+    if (n >= 1 && n <= 5) showAct(n);
+  }
+
+  // Load receipt count when act 5 is visible
+  const obs = new MutationObserver(() => {
+    if (document.getElementById('act5').classList.contains('visible')) loadReceiptCount();
+  });
+  obs.observe(document.getElementById('act5'), { attributes: true, attributeFilter: ['class'] });
+</script>
+</body>
+</html>
